@@ -1,7 +1,7 @@
 # Environment and Bootstrap Plan
 
-Status: **proposal only — installation is blocked pending review**  
-Audit date: 2026-08-17 (Asia/Shanghai)  
+Status: **revised proposal only — hardware preflight passes; installation remains blocked pending review**
+Audit date: 2026-08-17 (Asia/Shanghai), re-audited after GPU-mode restart
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
 ## 1. Constraints and decision summary
@@ -13,7 +13,8 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
   - Isaac Sim `5.1.0` + Isaac Lab `v2.3.2`, Python `3.11`, PyTorch `2.7.0+cu128`.
   - LeRobot `v0.6.0` with the `smolvla` feature set, Python `3.12`, PyTorch `2.8.0+cu128`, TorchCodec `0.7.x`, NumPy `2.2.x`.
   - ROS 2 Humble on Ubuntu 22.04 using its native Python `3.10`, communicating with Isaac Sim through DDS and the Isaac Sim ROS 2 bridge.
-- The current container is **not ready to install or validate the stack**: it has no allocated GPU device, only 0.5 CPU and 2 GiB RAM, and its 30 GiB root filesystem is below Isaac Sim's minimum storage recommendation. Resolve this provisioning issue before bootstrap.
+- The restarted container now passes the static hardware/resource preflight: one usable RTX 5090, a 25-CPU cgroup quota, 90 GiB RAM, 45 GiB shared memory, and 550 GiB on the data disk. The 30 GiB root filesystem remains intentionally code-only.
+- Installation is still prohibited until this revised document is reviewed. The Isaac Sim Compatibility Checker and simulator smoke tests remain pending because Isaac Sim has not been installed.
 
 ## 2. Remote-machine audit
 
@@ -23,31 +24,38 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 |---|---|---|
 | OS | Ubuntu 22.04.5 LTS (Jammy), x86_64; kernel `5.15.0-119-generic`; glibc `2.35` | Suitable for the proposed Isaac Sim 5.1 / ROS 2 Humble baseline. |
 | Container | Overlay root filesystem, AutoDL container hostname, no Docker/Podman/Apptainer CLI | Treat the leased instance itself as the outer isolation boundary; use Python environments inside it. |
-| CPU | Host exposes Intel Xeon Platinum 8470Q topology, but cgroup `cpu.max=50000 100000` | Effective limit is **0.5 CPU**, insufficient for install, shader compilation, simulation, or data loading. |
-| Memory | Host reports 754 GiB, but cgroup `memory.max=2147483648`; no swap | Effective limit is **2 GiB**, already close to full during audit; Isaac requires at least 32 GiB. |
-| GPU | `/proc/driver/nvidia/gpus` lists eight RTX 5090 devices on the host | No `/dev/nvidia*` nodes are assigned to this container, so none is usable. |
-| NVIDIA driver | Host module `580.105.08` | Meets the Isaac Sim 5.1 recommendation (`>=580.65.06`) and LeRobot cu128 floor (`>=570.86`), but cannot be tested without a GPU device. |
-| `nvidia-smi` | `/usr/bin/nvidia-smi` is a zero-byte, non-executable placeholder | GPU identity, VRAM, utilization, and runtime CUDA compatibility cannot be validated in this container. |
+| CPU | Host topology exposes 208 CPUs; cgroup `cpu.max=2500000 100000` | Effective quota is **25 CPUs**. `nproc` alone is misleading because the cpuset still exposes CPUs 0-207. Resource gate passes. |
+| Memory | Host reports 754 GiB; cgroup `memory.max=96636764160`; no swap | Effective limit is **90 GiB**, with about 370 MiB in use during audit. Resource gate passes. |
+| Shared memory | `/dev/shm` is a 45 GiB tmpfs | Adequate starting point for data-loading and simulator IPC; monitor during vectorized workloads. |
+| GPU | One NVIDIA GeForce RTX 5090, UUID `GPU-11df53b9-8a6e-3ea4-81df-ec6ed8b5cc54`, compute capability 12.0, 32,607 MiB VRAM | GPU gate passes. It is physical `/dev/nvidia3` but logical CUDA/NVML device 0; code must select logical devices rather than hard-code a physical device node. |
+| NVIDIA driver | `580.105.08`; `nvidia-smi` reports maximum supported CUDA `13.0` | Meets the Isaac Sim 5.1 recommendation (`>=580.65.06`) and LeRobot cu128 floor (`>=570.86`). No driver change is proposed. |
+| `nvidia-smi` | Executable and healthy; idle GPU, 0 MiB allocated at audit, 575 W power limit | Identity, VRAM, driver, and runtime access are validated. |
 | CUDA toolkit | `/usr/local/cuda -> /usr/local/cuda-12.8`; NVCC `12.8.93`; CUDA packages `12.8.1` | Appropriate for cu128 builds. NVCC works by absolute path but `/usr/local/cuda/bin` is not on `PATH`. Do not set a global CUDA path yet. |
 | cuDNN | System packages `9.8.0.87` for CUDA 12; base PyTorch reports cuDNN `91002` from its wheel/runtime | Avoid mixing system cuDNN with wheel-bundled runtimes via global `LD_LIBRARY_PATH`. |
 | Python | Miniconda base only: Python `3.12.3`, pip `24.0`; no `/usr/bin/python3` | Base must remain untouched. Dedicated Python 3.11 and 3.12 environments are required; ROS 2 later needs Ubuntu's system Python 3.10 packages. |
-| Existing ML packages | Base has `torch 2.8.0+cu128`, `torchvision 0.23.0+cu128`, `numpy 2.3.2`; CUDA unavailable/device count 0 | Do not reuse base. Its NumPy is outside LeRobot's `<2.3` bound, and it is the wrong Python ABI for Isaac Sim 5.x. |
+| Existing ML packages | Base has `torch 2.8.0+cu128`, `torchvision 0.23.0+cu128`, `numpy 2.3.2`; CUDA device count 1 | A CUDA tensor operation succeeds, capability `(12, 0)` is detected, and the wheel contains `sm_120`. Still do not reuse base: NumPy is outside LeRobot's `<2.3` bound and Python is wrong for Isaac Sim 5.x. |
 | ROS 2 | No `/opt/ros`, no `ros2`, no ROS environment variables/packages | ROS 2 is not installed. |
-| Graphics | No `DISPLAY`, Wayland, Vulkan tools, GLX tools, or Xorg | Start with headless mode. Verify Vulkan and WebRTC/headless rendering only after GPU provisioning. |
+| Graphics | No `DISPLAY`, Wayland, Vulkan tools, GLX tools, Xorg, or FFmpeg | Start with headless mode. Verify Vulkan/RTX rendering and install only reviewed FFmpeg dependencies when their stage is approved. |
 | System disk | Overlay `/`: 30 GiB total, about 30 GiB free | Too small for Isaac Sim, environments, caches, and artifacts together. Keep it code-only. |
 | Data disk | `/root/autodl-tmp`: 550 GiB total, essentially empty | Use for environments, Isaac binaries/assets, caches, datasets, checkpoints, and experiment runs. |
-| Repository | Clean `main` at `2e93025`; only `AGENTS.md` and root `PROJECT_CONTEXT.md`; `docs/` absent at audit start | Create documentation/skeleton only after plan approval, except this requested proposal. |
+| Thread environment | `OMP_NUM_THREADS=0` and `MKL_NUM_THREADS=0` | Invalid for libgomp (confirmed warning). Project launch wrappers must unset them or set a positive value derived from the 25-CPU quota before running Python workloads. |
+| Repository | Clean `main` at `c902e3f`; `docs/PROJECT_CONTEXT.md` and this file are committed | `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` referenced by `AGENTS.md` do not yet exist; create them only in the approved repository-bootstrap stage. |
 
-### 2.2 Installation blockers and preflight gates
+### 2.2 Preflight gate status
 
-All of the following must pass before package installation:
+| Gate | Required | Re-audit result | Status |
+|---|---|---|---|
+| GPU allocation | One RTX GPU with control/UVM device access | RTX 5090, logical device 0; `/dev/nvidia3`, `nvidiactl`, and UVM nodes present | Pass |
+| Driver/runtime | Healthy `nvidia-smi`; compatible driver | 580.105.08; CUDA access and a PyTorch CUDA tensor operation succeed | Pass |
+| CPU | >=8 effective CPUs | 25-CPU cgroup quota | Pass |
+| RAM | >=32 GiB; 64 GiB preferred | 90 GiB cgroup limit | Pass |
+| Shared memory | Sufficient for headless simulator/data workers | 45 GiB `/dev/shm` | Pass |
+| Data disk | >=350 GiB free | About 550 GiB free at `/root/autodl-tmp` | Pass |
+| System disk policy | Keep heavy state off 30 GiB root | Storage strategy defined; not yet implemented | Pending Stage 2 |
+| Thread variables | Positive/valid BLAS/OpenMP settings | Both are currently `0` and produce a warning | Pending launch-wrapper fix in Stage 2 |
+| Isaac compatibility check | Official checker plus headless smoke test | Tool is not installed, by instruction | Pending approved Stage 4 |
 
-1. Lease/attach exactly one RTX 5090 to the container; `/dev/nvidia0`, `/dev/nvidiactl`, and related nodes must exist.
-2. `nvidia-smi` must execute and report RTX 5090, 32 GiB VRAM, driver `580.105.08` (or another reviewed compatible version), and no error.
-3. Raise the container allocation to at least 8 CPU cores and 32 GiB RAM; 64 GiB RAM is preferred for combined simulation/data workflows.
-4. Confirm at least 350 GiB free on `/root/autodl-tmp` before downloading simulator assets, datasets, and checkpoints.
-5. Run the Isaac Sim Compatibility Checker after the GPU is available.
-6. Re-run a compact audit and save it as a dated section in this file before changing dependencies.
+The former no-GPU/low-resource blocker is resolved. The only authorization blocker is review of this plan; the remaining technical checks are deliberately placed in their later approved stages.
 
 ## 3. Proposed repository structure
 
@@ -64,7 +72,7 @@ EmbodiedAI/
 │   ├── rl/                        # residual PPO/SAC configs
 │   └── evaluation/                # task suites and robustness sweeps
 ├── docs/
-│   ├── PROJECT_CONTEXT.md         # move root document here after review
+│   ├── PROJECT_CONTEXT.md         # existing project goals and scope
 │   ├── ARCHITECTURE.md
 │   ├── ENVIRONMENT.md             # this document and future change log
 │   ├── ROADMAP.md
@@ -146,7 +154,7 @@ Do not activate Miniconda `base` when running project commands. Do not source RO
 |---|---|---:|---|---|
 | Isaac Sim | `5.1.0.0` pip distribution | 3.11 | Uses the Isaac 5.x Python ABI; pair with cu128 PyTorch below | Ubuntu 22.04 and glibc 2.35 fit. Run headless first. |
 | Isaac Lab | tag `v2.3.2` | 3.11 | Built for Isaac Sim 5.1; pin source tag/commit | Stable 2.x baseline. Prefer 2.3.2 over 2.3.1 because 2.3.2 is the current patch release. |
-| PyTorch for Isaac | `torch 2.7.0+cu128`, `torchvision 0.22.0+cu128`, `torchaudio 2.7.0+cu128` | 3.11 | Isaac Lab 2.3.x's x86_64 pin; CUDA 12.8 adds Blackwell support | Driver 580.105.08 is above the Isaac 5.1 recommendation. Verify `sm_120` execution after GPU assignment. |
+| PyTorch for Isaac | `torch 2.7.0+cu128`, `torchvision 0.22.0+cu128`, `torchaudio 2.7.0+cu128` | 3.11 | Isaac Lab 2.3.x's x86_64 pin; CUDA 12.8 adds Blackwell support | Driver 580.105.08 is above the Isaac 5.1 recommendation. Base PyTorch 2.8 has already verified `sm_120`; repeat with the pinned Isaac wheel during Stage 4. |
 | LeRobot / SmolVLA | LeRobot tag `v0.6.0`, `smolvla` extra | >=3.12 (choose 3.12) | LeRobot allows PyTorch `>=2.7,<2.12` and NumPy `>=2.0,<2.3` | Keep separate from Isaac. Pin the released tag, not current main (`0.6.1` metadata). |
 | PyTorch for VLA | `torch 2.8.0+cu128`, `torchvision 0.23.0+cu128`, `torchaudio 2.8.0+cu128`; TorchCodec `0.7.x`; NumPy `2.2.x` | 3.12 | Official cu128 wheels; TorchCodec 0.7 matches PyTorch 2.8 | Driver 580.105.08 exceeds LeRobot's documented cu128 floor 570.86. Validate NVDEC/FFmpeg separately; CPU decoding is acceptable initially. |
 | ROS 2 | Humble binary packages for Ubuntu 22.04 | system 3.10 | No PyTorch/CUDA dependency in the ROS environment | Native distro match. External nodes communicate over DDS; Isaac uses its bundled Humble bridge libraries under Python 3.11. |
@@ -168,7 +176,7 @@ Isaac Sim 6.0/6.0.1 and Isaac Lab 3.0 beta/develop are not selected for the MVP.
 
 ## 6. Staged bootstrap plan
 
-No stage below Stage 0 is authorized by this proposal.
+Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. No repository-bootstrap or installation-bearing stage (Stages 2-8) is authorized by this proposal.
 
 ### Stage 0 — Review and freeze the plan (current stage)
 
@@ -178,20 +186,21 @@ No stage below Stage 0 is authorized by this proposal.
 
 Exit gate: explicit approval to begin provisioning/bootstrap.
 
-### Stage 1 — Provision and re-audit hardware
+### Stage 1 — Provision and re-audit hardware (static preflight complete)
 
-- Start/attach a GPU-enabled container allocation with >=8 CPUs and >=32 GiB RAM.
-- Validate `nvidia-smi`, RTX 5090 VRAM, device nodes, cgroup limits, disk, internet access, and headless graphics/Vulkan prerequisites.
-- Run the Isaac Sim Compatibility Checker.
+- GPU-enabled allocation now provides one RTX 5090, 25 effective CPUs, 90 GiB RAM, and 45 GiB `/dev/shm`.
+- `nvidia-smi`, device nodes, cgroup limits, disk, and a PyTorch `sm_120` CUDA tensor operation pass.
+- Run the Isaac Sim Compatibility Checker at the start of Stage 4, once the approved simulator tooling exists.
 - Do **not** change the NVIDIA driver unless a separate reviewed plan requires it.
 
-Exit gate: machine-readable preflight passes and the results are appended here.
+Exit gate: static hardware preflight passes. Compatibility-checker and rendering gates remain in Stage 4.
 
 ### Stage 2 — Create repository skeleton and storage policy
 
-- Create the approved directories, move `PROJECT_CONTEXT.md` to `docs/`, and add the missing architecture/roadmap/data-format documents.
+- Create the approved directories and add the missing architecture/roadmap/data-format documents. `PROJECT_CONTEXT.md` is already under `docs/`.
 - Add `.gitignore` rules for environments, assets, datasets, caches, runs, checkpoints, and generated ROS build trees.
 - Create `/root/autodl-tmp/EmbodiedAI/*` storage directories and document environment variables.
+- Add launch wrappers that unset or assign positive values to `OMP_NUM_THREADS` and `MKL_NUM_THREADS` based on the 25-CPU quota.
 - Add dependency-light schemas and a minimal test harness only.
 
 Exit gate: clean repository, documented paths, no large files in Git.
@@ -254,7 +263,7 @@ Before installation, approve or amend:
 1. Stable baseline: Isaac Sim 5.1.0 + Isaac Lab v2.3.2 instead of the Isaac 6 / Lab 3 beta line.
 2. Three runtime boundaries: Isaac Python 3.11, VLA Python 3.12, ROS 2 Humble system Python 3.10.
 3. `uv` for Python locking, with all heavy environments/caches on `/root/autodl-tmp`.
-4. Minimum resource gate: one allocated RTX 5090, >=8 CPU, >=32 GiB RAM (64 GiB preferred), >=350 GiB data-disk free.
+4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
 
 ## 8. References
@@ -275,3 +284,4 @@ Before installation, approve or amend:
 ## 9. Change log
 
 - 2026-08-17: Initial proposal recorded after read-only audit. No packages installed or modified. Awaiting review.
+- 2026-08-17: Re-audited after restart in GPU mode. Confirmed one usable RTX 5090, driver 580.105.08, CUDA capability 12.0, 25-CPU quota, 90 GiB RAM, and 45 GiB shared memory. Removed the former hardware blocker and recorded invalid thread-count variables. No packages installed or modified; plan still awaits review.
