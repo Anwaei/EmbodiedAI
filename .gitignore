@@ -1,0 +1,55 @@
+# Python bytecode and test output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+
+# Local environments and package/build output
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+
+# uv may create project-local environments if the bootstrap wrapper is bypassed
+env/*/.venv/
+
+# ROS 2 generated workspaces
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Large or generated project state (canonical copies live on the data disk)
+assets/
+caches/
+datasets/
+checkpoints/
+models/
+runs/
+tmp/
+artifacts/
+logs/
+wandb/
+
+# Common model/data artifacts
+*.bag
+*.db3
+*.mcap
+*.hdf5
+*.h5
+*.npy
+*.npz
+*.onnx
+*.pt
+*.pth
+*.safetensors
+
+# Editors and OS files
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

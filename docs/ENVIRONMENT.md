@@ -1,20 +1,21 @@
 # Environment and Bootstrap Plan
 
-Status: **revised proposal only — hardware preflight passes; installation remains blocked pending review**
-Audit date: 2026-08-17 (Asia/Shanghai), re-audited after GPU-mode restart
+Status: **Stage 0 approved; Stages 2-3 completed; Stages 4-8 not approved**
+Audit date: 2026-08-17 (hardware), updated 2026-08-20 after Stage 2/3 execution
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
 ## 1. Constraints and decision summary
 
 - The project targets language-conditioned manipulation in Isaac Sim / Isaac Lab, demonstration generation, SmolVLA fine-tuning, optional residual RL, and a ROS 2 deployment interface.
 - Simulation, VLA training, and ROS 2 must remain isolated because their supported Python and package stacks differ.
-- Do not mutate Miniconda `base`, install system-wide Python packages, change the NVIDIA driver, or start dependency installation until this document is reviewed.
+- Do not mutate Miniconda `base`, install system-wide Python packages, change the NVIDIA driver, or start a heavy-environment installation without approval for its later stage.
 - Recommended stable baseline:
   - Isaac Sim `5.1.0` + Isaac Lab `v2.3.2`, Python `3.11`, PyTorch `2.7.0+cu128`.
   - LeRobot `v0.6.0` with the `smolvla` feature set, Python `3.12`, PyTorch `2.8.0+cu128`, TorchCodec `0.7.x`, NumPy `2.2.x`.
   - ROS 2 Humble on Ubuntu 22.04 using its native Python `3.10`, communicating with Isaac Sim through DDS and the Isaac Sim ROS 2 bridge.
 - The restarted container now passes the static hardware/resource preflight: one usable RTX 5090, a 25-CPU cgroup quota, 90 GiB RAM, 45 GiB shared memory, and 550 GiB on the data disk. The 30 GiB root filesystem remains intentionally code-only.
-- Installation is still prohibited until this revised document is reviewed. The Isaac Sim Compatibility Checker and simulator smoke tests remain pending because Isaac Sim has not been installed.
+- Stage 0 was approved. Repository/bootstrap and lock-only work in Stages 2-3 completed on 2026-08-20. The Isaac Sim Compatibility Checker, package installation, and simulator/GPU smoke tests remain pending because Stages 4-5 are not approved.
+- Stage 2/3 execution occurred while the leased server was in no-GPU mode; this was acceptable for lock-only work and no GPU test was attempted. The GPU-mode hardware audit above remains the acceptance baseline for the later runtime stages.
 
 ## 2. Remote-machine audit
 
@@ -39,7 +40,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 | System disk | Overlay `/`: 30 GiB total, about 30 GiB free | Too small for Isaac Sim, environments, caches, and artifacts together. Keep it code-only. |
 | Data disk | `/root/autodl-tmp`: 550 GiB total, essentially empty | Use for environments, Isaac binaries/assets, caches, datasets, checkpoints, and experiment runs. |
 | Thread environment | `OMP_NUM_THREADS=0` and `MKL_NUM_THREADS=0` | Invalid for libgomp (confirmed warning). Project launch wrappers must unset them or set a positive value derived from the 25-CPU quota before running Python workloads. |
-| Repository | Clean `main` at `c902e3f`; `docs/PROJECT_CONTEXT.md` and this file are committed | `docs/ARCHITECTURE.md` and `docs/ROADMAP.md` referenced by `AGENTS.md` do not yet exist; create them only in the approved repository-bootstrap stage. |
+| Repository | Stage 2 began from `main` at `98a7d8759b47`; `docs/PROJECT_CONTEXT.md` and this file were committed | Stage 2/3 files are present as an uncommitted review set. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/DATA_FORMAT.md`, and the repository skeleton now exist. |
 
 ### 2.2 Preflight gate status
 
@@ -51,11 +52,11 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 | RAM | >=32 GiB; 64 GiB preferred | 90 GiB cgroup limit | Pass |
 | Shared memory | Sufficient for headless simulator/data workers | 45 GiB `/dev/shm` | Pass |
 | Data disk | >=350 GiB free | About 550 GiB free at `/root/autodl-tmp` | Pass |
-| System disk policy | Keep heavy state off 30 GiB root | Storage strategy defined; not yet implemented | Pending Stage 2 |
-| Thread variables | Positive/valid BLAS/OpenMP settings | Both are currently `0` and produce a warning | Pending launch-wrapper fix in Stage 2 |
+| System disk policy | Keep heavy state off 30 GiB root | Environments, tools, caches, datasets, models, checkpoints, artifacts, runs, and temporary state route to `/root/autodl-tmp/EmbodiedAI` | Pass (Stage 2) |
+| Thread variables | Positive/valid BLAS/OpenMP settings | Explicit project wrapper assigns positive defaults (`8`) and rejects invalid overrides | Pass (Stage 2) |
 | Isaac compatibility check | Official checker plus headless smoke test | Tool is not installed, by instruction | Pending approved Stage 4 |
 
-The former no-GPU/low-resource blocker is resolved. The only authorization blocker is review of this plan; the remaining technical checks are deliberately placed in their later approved stages.
+The former no-GPU/low-resource blocker was resolved by the GPU-mode audit. The current allocation may be switched back to no-GPU mode between runtime stages. Stage 4 remains an explicit authorization gate; its technical checks must run only after the Isaac environment installation is approved.
 
 ## 3. Proposed repository structure
 
@@ -127,7 +128,7 @@ Design rules:
 | `vla` | `/root/autodl-tmp/EmbodiedAI/envs/vla` | 3.12 | LeRobot, SmolVLA, dataset tooling, fine-tuning/evaluation | Isaac Sim/Lab, `rclpy` from system ROS |
 | ROS 2 Humble | `/opt/ros/humble` + `ros2_ws/install` | system 3.10 | deployment nodes, messages, launch, DDS | Conda/uv Python runtimes and their shared libraries |
 
-Use `uv` with one independent project and lock file per Python environment after approval. `uv` is not currently installed. Install it only in user/data-disk scope; place `UV_CACHE_DIR`, Hugging Face cache, Torch cache, Omniverse cache, and shader/cache directories on `/root/autodl-tmp`.
+Stage 3 installed uv `0.12.5` at `/root/autodl-tmp/EmbodiedAI/tools/bin/uv` and uv-managed CPython `3.11.16` and `3.12.14` under the data disk. Each Python environment now has an independent project and lock file. `UV_CACHE_DIR`, Hugging Face, Torch/Triton/compiler, CUDA shader, Omniverse, W&B, Python bytecode, and temporary paths are redirected to `/root/autodl-tmp/EmbodiedAI` by the explicitly sourced project wrapper.
 
 Do not activate Miniconda `base` when running project commands. Do not source ROS 2 in `.bashrc`; use explicit launch wrappers so ROS library paths cannot contaminate Isaac or VLA shells. Do not export system CUDA/cuDNN library directories globally. PyTorch wheels carry their CUDA runtime; `/usr/local/cuda-12.8` is used only for extensions that explicitly require NVCC.
 
@@ -176,15 +177,17 @@ Isaac Sim 6.0/6.0.1 and Isaac Lab 3.0 beta/develop are not selected for the MVP.
 
 ## 6. Staged bootstrap plan
 
-Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. No repository-bootstrap or installation-bearing stage (Stages 2-8) is authorized by this proposal.
+Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and the user authorized Stage 2 and Stage 3 only. Both completed on 2026-08-20. Stages 4-8 remain unauthorized.
 
-### Stage 0 — Review and freeze the plan (current stage)
+### Stage 0 — Review and freeze the plan (approved)
 
 - Review version choices, repository layout, storage paths, and isolation boundaries.
 - Decide whether the stable Isaac 5.1/Lab 2.3.2 path is accepted.
 - Record approval in this document's change log.
 
 Exit gate: explicit approval to begin provisioning/bootstrap.
+
+Result: approved by the user before the 2026-08-20 Stage 2/3 execution.
 
 ### Stage 1 — Provision and re-audit hardware (static preflight complete)
 
@@ -195,7 +198,7 @@ Exit gate: explicit approval to begin provisioning/bootstrap.
 
 Exit gate: static hardware preflight passes. Compatibility-checker and rendering gates remain in Stage 4.
 
-### Stage 2 — Create repository skeleton and storage policy
+### Stage 2 — Create repository skeleton and storage policy (completed 2026-08-20)
 
 - Create the approved directories and add the missing architecture/roadmap/data-format documents. `PROJECT_CONTEXT.md` is already under `docs/`.
 - Add `.gitignore` rules for environments, assets, datasets, caches, runs, checkpoints, and generated ROS build trees.
@@ -205,7 +208,11 @@ Exit gate: static hardware preflight passes. Compatibility-checker and rendering
 
 Exit gate: clean repository, documented paths, no large files in Git.
 
-### Stage 3 — Bootstrap tooling and resolve locks
+Result: repository skeleton, missing core documents, ignore policy, dependency-light
+contracts/tests, Omniverse path configuration, external storage tree, and explicit project
+environment wrapper were created. Large runtime state is outside Git.
+
+### Stage 3 — Bootstrap tooling and resolve locks (completed 2026-08-20)
 
 - Install `uv` in user/data-disk scope, not system-wide.
 - Create independent `dev`, `isaac`, and `vla` definitions with exact Python versions and indexes.
@@ -213,6 +220,12 @@ Exit gate: clean repository, documented paths, no large files in Git.
 - Produce a dependency report showing Python, PyTorch, CUDA wheel, NumPy, and known ABI pins.
 
 Exit gate: lock review succeeds; no resolver conflicts.
+
+Result: independent `dev`, `isaac`, and `vla` projects and lock files validate with
+`uv lock --check`. The Isaac Linux metadata's unmarked Windows-only `pywin32==306`
+dependency required a platform-scoped uv override; requested version pins were unchanged.
+See `docs/DEPENDENCY_LOCKS.md` for the resolved versions, index review, hashes, and deferred
+runtime validation.
 
 ### Stage 4 — Install and validate the Isaac environment
 
@@ -256,15 +269,18 @@ Exit gate: simulated sensor/state/language input reaches the policy node and saf
 
 Exit gate: a documented clean-room rebuild and MVP evaluation report succeed.
 
-## 7. Review decisions requested
+## 7. Approved decisions and next review gate
 
-Before installation, approve or amend:
+The Stage 0 approval accepted:
 
 1. Stable baseline: Isaac Sim 5.1.0 + Isaac Lab v2.3.2 instead of the Isaac 6 / Lab 3 beta line.
 2. Three runtime boundaries: Isaac Python 3.11, VLA Python 3.12, ROS 2 Humble system Python 3.10.
 3. `uv` for Python locking, with all heavy environments/caches on `/root/autodl-tmp`.
 4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
+
+Next review gate: approve or amend Stage 4 before any Isaac Sim/Isaac Lab packages are
+installed or any GPU/simulator smoke test is run.
 
 ## 8. References
 
@@ -285,3 +301,5 @@ Before installation, approve or amend:
 
 - 2026-08-17: Initial proposal recorded after read-only audit. No packages installed or modified. Awaiting review.
 - 2026-08-17: Re-audited after restart in GPU mode. Confirmed one usable RTX 5090, driver 580.105.08, CUDA capability 12.0, 25-CPU quota, 90 GiB RAM, and 45 GiB shared memory. Removed the former hardware blocker and recorded invalid thread-count variables. No packages installed or modified; plan still awaits review.
+- 2026-08-20: Recorded explicit Stage 0 approval and authorization for Stage 2 and Stage 3 only.
+- 2026-08-20: Completed Stage 2 repository/storage bootstrap and Stage 3 uv definitions, lock resolution, and lock review. Stages 4-8 remain unapproved.

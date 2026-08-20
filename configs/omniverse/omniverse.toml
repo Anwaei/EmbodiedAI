@@ -1,0 +1,4 @@
+[paths]
+data_root = "/root/autodl-tmp/EmbodiedAI/caches/omniverse/data"
+cache_root = "/root/autodl-tmp/EmbodiedAI/caches/omniverse/cache"
+logs_root = "/root/autodl-tmp/EmbodiedAI/runs/omniverse/logs"

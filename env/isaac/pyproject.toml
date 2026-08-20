@@ -1,0 +1,31 @@
+[project]
+name = "embodiedai-isaac-env"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+dependencies = [
+    "isaacsim[all,extscache]==5.1.0",
+    "torch==2.7.0",
+    "torchaudio==2.7.0",
+    "torchvision==0.22.0",
+]
+
+[tool.uv]
+package = false
+environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
+override-dependencies = ["pywin32==306; sys_platform == 'win32'"]
+
+[tool.uv.sources]
+isaacsim = { index = "nvidia-isaac" }
+torch = { index = "pytorch-cu128" }
+torchaudio = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[[tool.uv.index]]
+name = "nvidia-isaac"
+url = "https://pypi.nvidia.com"
+explicit = true
