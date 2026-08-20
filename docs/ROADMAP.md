@@ -5,11 +5,11 @@
 | Stage | Scope | Status |
 |---|---|---|
 | 0 | Review environment and architecture plan | Approved |
-| 1 | Hardware audit | Completed previously; server may currently run in no-GPU mode |
+| 1 | Hardware audit | Completed; GPU-mode allocation revalidated 2026-08-20 |
 | 2 | Repository skeleton and storage policy | Completed 2026-08-20 |
 | 3 | uv tooling, independent definitions, and lock review | Completed 2026-08-20; see `DEPENDENCY_LOCKS.md` |
-| 4 | Install and validate Isaac environment | Not approved |
-| 5 | Install and validate VLA environment | Not approved |
+| 4 | Install and validate Isaac environment | Completed 2026-08-20; see `ENVIRONMENT.md` |
+| 5 | Install and validate VLA environment | Completed 2026-08-21; see `ENVIRONMENT.md` |
 | 6 | Demonstration-to-policy integration | Not approved |
 | 7 | ROS 2 deployment boundary | Not approved |
 | 8 | Reproducibility and robustness gate | Not approved |

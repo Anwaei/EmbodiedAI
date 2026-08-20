@@ -1,7 +1,7 @@
 # Environment and Bootstrap Plan
 
-Status: **Stage 0 approved; Stages 2-3 completed; Stages 4-8 not approved**
-Audit date: 2026-08-17 (hardware), updated 2026-08-20 after Stage 2/3 execution
+Status: **Stages 0, 4, and 5 approved; Stages 1-5 completed; Stages 6-8 not approved**
+Audit date: 2026-08-17 (hardware), updated 2026-08-21 after Stage 5 completion
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
 ## 1. Constraints and decision summary
@@ -14,7 +14,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
   - LeRobot `v0.6.0` with the `smolvla` feature set, Python `3.12`, PyTorch `2.8.0+cu128`, TorchCodec `0.7.x`, NumPy `2.2.x`.
   - ROS 2 Humble on Ubuntu 22.04 using its native Python `3.10`, communicating with Isaac Sim through DDS and the Isaac Sim ROS 2 bridge.
 - The restarted container now passes the static hardware/resource preflight: one usable RTX 5090, a 25-CPU cgroup quota, 90 GiB RAM, 45 GiB shared memory, and 550 GiB on the data disk. The 30 GiB root filesystem remains intentionally code-only.
-- Stage 0 was approved. Repository/bootstrap and lock-only work in Stages 2-3 completed on 2026-08-20. The Isaac Sim Compatibility Checker, package installation, and simulator/GPU smoke tests remain pending because Stages 4-5 are not approved.
+- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 remains a separate, unapproved gate.
 - Stage 2/3 execution occurred while the leased server was in no-GPU mode; this was acceptable for lock-only work and no GPU test was attempted. The GPU-mode hardware audit above remains the acceptance baseline for the later runtime stages.
 
 ## 2. Remote-machine audit
@@ -28,7 +28,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 | CPU | Host topology exposes 208 CPUs; cgroup `cpu.max=2500000 100000` | Effective quota is **25 CPUs**. `nproc` alone is misleading because the cpuset still exposes CPUs 0-207. Resource gate passes. |
 | Memory | Host reports 754 GiB; cgroup `memory.max=96636764160`; no swap | Effective limit is **90 GiB**, with about 370 MiB in use during audit. Resource gate passes. |
 | Shared memory | `/dev/shm` is a 45 GiB tmpfs | Adequate starting point for data-loading and simulator IPC; monitor during vectorized workloads. |
-| GPU | One NVIDIA GeForce RTX 5090, UUID `GPU-11df53b9-8a6e-3ea4-81df-ec6ed8b5cc54`, compute capability 12.0, 32,607 MiB VRAM | GPU gate passes. It is physical `/dev/nvidia3` but logical CUDA/NVML device 0; code must select logical devices rather than hard-code a physical device node. |
+| GPU | One NVIDIA GeForce RTX 5090, current allocation UUID `GPU-50163d07-93c3-b029-7a85-5404818875ad`, compute capability 12.0, 32,607 MiB VRAM | GPU gate passes. It is currently physical `/dev/nvidia5` but logical CUDA/NVML device 0; allocation restarts can change the UUID/device node, so code must select logical devices rather than hard-code either value. |
 | NVIDIA driver | `580.105.08`; `nvidia-smi` reports maximum supported CUDA `13.0` | Meets the Isaac Sim 5.1 recommendation (`>=580.65.06`) and LeRobot cu128 floor (`>=570.86`). No driver change is proposed. |
 | `nvidia-smi` | Executable and healthy; idle GPU, 0 MiB allocated at audit, 575 W power limit | Identity, VRAM, driver, and runtime access are validated. |
 | CUDA toolkit | `/usr/local/cuda -> /usr/local/cuda-12.8`; NVCC `12.8.93`; CUDA packages `12.8.1` | Appropriate for cu128 builds. NVCC works by absolute path but `/usr/local/cuda/bin` is not on `PATH`. Do not set a global CUDA path yet. |
@@ -36,11 +36,11 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 | Python | Miniconda base only: Python `3.12.3`, pip `24.0`; no `/usr/bin/python3` | Base must remain untouched. Dedicated Python 3.11 and 3.12 environments are required; ROS 2 later needs Ubuntu's system Python 3.10 packages. |
 | Existing ML packages | Base has `torch 2.8.0+cu128`, `torchvision 0.23.0+cu128`, `numpy 2.3.2`; CUDA device count 1 | A CUDA tensor operation succeeds, capability `(12, 0)` is detected, and the wheel contains `sm_120`. Still do not reuse base: NumPy is outside LeRobot's `<2.3` bound and Python is wrong for Isaac Sim 5.x. |
 | ROS 2 | No `/opt/ros`, no `ros2`, no ROS environment variables/packages | ROS 2 is not installed. |
-| Graphics | No `DISPLAY`, Wayland, Vulkan tools, GLX tools, Xorg, or FFmpeg | Start with headless mode. Verify Vulkan/RTX rendering and install only reviewed FFmpeg dependencies when their stage is approved. |
-| System disk | Overlay `/`: 30 GiB total, about 30 GiB free | Too small for Isaac Sim, environments, caches, and artifacts together. Keep it code-only. |
-| Data disk | `/root/autodl-tmp`: 550 GiB total, essentially empty | Use for environments, Isaac binaries/assets, caches, datasets, checkpoints, and experiment runs. |
+| Graphics/media | No `DISPLAY`, Wayland, or Xorg; Stage 4 added `libvulkan1`, `vulkan-tools`, `libglu1-mesa`, `libegl1`, and `libxt6` user-space prerequisites plus diagnostic `strace`; Stage 5 added Ubuntu's user-space `ffmpeg` package and its runtime libraries | Vulkan sees only the logical RTX 5090. Headless RTX rendering and short-lived private WebRTC service startup pass. TorchCodec 0.7.0 successfully decodes a generated H.264 file on CPU through FFmpeg 4.4.2. |
+| System disk | Overlay `/`: 30 GiB total, 29 GiB free after Stage 5 | Heavy state remained off the root filesystem. |
+| Data disk | `/root/autodl-tmp`: 550 GiB total, 490 GiB free after Stage 5 | The VLA environment is 7.2 GiB, the shared uv cache is 32 GiB, and reviewed VLA model files are 870 MiB. Continue using this disk for all large state. |
 | Thread environment | `OMP_NUM_THREADS=0` and `MKL_NUM_THREADS=0` | Invalid for libgomp (confirmed warning). Project launch wrappers must unset them or set a positive value derived from the 25-CPU quota before running Python workloads. |
-| Repository | Stage 2 began from `main` at `98a7d8759b47`; `docs/PROJECT_CONTEXT.md` and this file were committed | Stage 2/3 files are present as an uncommitted review set. `docs/ARCHITECTURE.md`, `docs/ROADMAP.md`, `docs/DATA_FORMAT.md`, and the repository skeleton now exist. |
+| Repository | Stage 2 began from `main` at `98a7d8759b47`; `docs/PROJECT_CONTEXT.md` and this file were committed | Stage 2-5 changes remain an uncommitted review set. Environment locks, runtime documentation, reproducible smoke scripts, and the repository skeleton are present. |
 
 ### 2.2 Preflight gate status
 
@@ -51,12 +51,13 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 | CPU | >=8 effective CPUs | 25-CPU cgroup quota | Pass |
 | RAM | >=32 GiB; 64 GiB preferred | 90 GiB cgroup limit | Pass |
 | Shared memory | Sufficient for headless simulator/data workers | 45 GiB `/dev/shm` | Pass |
-| Data disk | >=350 GiB free | About 550 GiB free at `/root/autodl-tmp` | Pass |
+| Data disk | >=350 GiB free | About 490 GiB free at `/root/autodl-tmp` after Stage 5 | Pass |
 | System disk policy | Keep heavy state off 30 GiB root | Environments, tools, caches, datasets, models, checkpoints, artifacts, runs, and temporary state route to `/root/autodl-tmp/EmbodiedAI` | Pass (Stage 2) |
 | Thread variables | Positive/valid BLAS/OpenMP settings | Explicit project wrapper assigns positive defaults (`8`) and rejects invalid overrides | Pass (Stage 2) |
-| Isaac compatibility check | Official checker plus headless smoke test | Tool is not installed, by instruction | Pending approved Stage 4 |
+| Isaac compatibility check | Official checker plus headless smoke test | Official checker passed; Vulkan, PhysX, RTX camera, Isaac Lab Franka/vectorization, RSL-RL, and WebRTC startup tests passed | Pass (Stage 4) |
+| VLA runtime check | Locked install plus imports, CUDA, media, dataset, inference, and PEFT smoke tests | PyTorch cu128 runs on `sm_120`; TorchCodec CPU decode, LeRobot dataset round trip, offline SmolVLA inference, and one LoRA optimizer step passed | Pass (Stage 5) |
 
-The former no-GPU/low-resource blocker was resolved by the GPU-mode audit. The current allocation may be switched back to no-GPU mode between runtime stages. Stage 4 remains an explicit authorization gate; its technical checks must run only after the Isaac environment installation is approved.
+The former no-GPU/low-resource blocker was resolved by the GPU-mode audit. Stages 4 and 5 then completed in GPU allocations. Stage 6 is the next explicit authorization gate; Stage 5 approval did not authorize simulation-to-policy integration work.
 
 ## 3. Proposed repository structure
 
@@ -177,7 +178,28 @@ Isaac Sim 6.0/6.0.1 and Isaac Lab 3.0 beta/develop are not selected for the MVP.
 
 ## 6. Staged bootstrap plan
 
-Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and the user authorized Stage 2 and Stage 3 only. Both completed on 2026-08-20. Stages 4-8 remain unauthorized.
+Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were then separately approved and completed. Stages 6-8 remain unauthorized.
+
+### GPU-mode execution policy for Stages 4 and 5
+
+The earlier A/B split is cancelled. Although package download and extraction do not inherently
+require a CUDA device, the observed no-GPU allocation exposed only about 0.5 CPU and 2 GiB RAM.
+That is not a reliable operating envelope for these large environments. Installation and
+validation will therefore run together in GPU mode so that the audited 25-CPU, 90-GiB RAM,
+45-GiB shared-memory, RTX 5090 allocation remains stable throughout each stage.
+
+Rules for both stages:
+
+- Begin from a fresh GPU-mode shell and repeat GPU identity, driver, device-node, cgroup,
+  shared-memory, and data-disk checks before any package synchronization.
+- Verify the reviewed lock hash before installation, install with `--locked`, then record the
+  resulting package inventory before runtime tests.
+- Keep environments, source checkouts, caches, assets, models, datasets, logs, and temporary
+  state below `/root/autodl-tmp/EmbodiedAI`.
+- Do not modify Miniconda base, the NVIDIA driver, system CUDA/cuDNN, global library paths, or
+  global ROS 2 state. A failed check returns to plan review instead of authorizing such changes.
+- No-GPU mode remains suitable for documentation and lock review only; do not install or run
+  the Isaac or VLA stacks there.
 
 ### Stage 0 — Review and freeze the plan (approved)
 
@@ -193,7 +215,7 @@ Result: approved by the user before the 2026-08-20 Stage 2/3 execution.
 
 - GPU-enabled allocation now provides one RTX 5090, 25 effective CPUs, 90 GiB RAM, and 45 GiB `/dev/shm`.
 - `nvidia-smi`, device nodes, cgroup limits, disk, and a PyTorch `sm_120` CUDA tensor operation pass.
-- Run the Isaac Sim Compatibility Checker at the start of Stage 4, once the approved simulator tooling exists.
+- Run the Isaac Sim Compatibility Checker during Stage 4, after the approved simulator tooling is installed.
 - Do **not** change the NVIDIA driver unless a separate reviewed plan requires it.
 
 Exit gate: static hardware preflight passes. Compatibility-checker and rendering gates remain in Stage 4.
@@ -224,25 +246,138 @@ Exit gate: lock review succeeds; no resolver conflicts.
 Result: independent `dev`, `isaac`, and `vla` projects and lock files validate with
 `uv lock --check`. The Isaac Linux metadata's unmarked Windows-only `pywin32==306`
 dependency required a platform-scoped uv override; requested version pins were unchanged.
+Before Stage 4, an explicitly authorized lock amendment added Isaac Lab v2.3.2 core, assets,
+tasks, and RSL-RL packages from immutable commit
+`37ddf626871758333d6ed89cf64ad702aef127d0`. Two additional upstream metadata defects required
+reviewed build/resolution constraints: `flatdict==4.0.1` needs `setuptools<82` to provide its
+undeclared `pkg_resources` build import, and Isaac Lab's exact `starlette==0.49.1` pin conflicts
+with Isaac Sim's FastAPI requirement. No Starlette import was found under the pinned core package,
+so the combined lock selects FastAPI-compatible `starlette==0.45.3`; this override must receive
+explicit import and livestream coverage in Stage 4.
 See `docs/DEPENDENCY_LOCKS.md` for the resolved versions, index review, hashes, and deferred
 runtime validation.
 
-### Stage 4 — Install and validate the Isaac environment
+### Stage 4 — Install and validate Isaac Sim and Isaac Lab in GPU mode (completed 2026-08-20)
 
-- Install the pinned Isaac Sim/Lab/PyTorch stack in the data-disk environment.
-- Test imports, `pip check`, CUDA availability, RTX 5090 kernel execution, and a minimal headless stage.
-- Test a camera/render sample, Franka scene, a small vectorized environment, and one short training smoke run.
-- Record resource use and cache locations.
+- Pass the GPU-mode resource audit and confirm at least 200 GiB remains free on the data disk.
+- Revalidate the reviewed `env/isaac/uv.lock`. It now includes Isaac Lab tag `v2.3.2` at
+  immutable commit `37ddf626871758333d6ed89cf64ad702aef127d0`, represented as separate
+  `isaaclab`, `isaaclab-assets`, `isaaclab-tasks`, and `isaaclab-rl[rsl-rl]` Git-subdirectory
+  packages. `isaaclab_mimic` and `isaaclab_contrib` are deliberately deferred until a concrete
+  Stage 6 requirement justifies their additional dependencies.
+- Keep a matching source checkout at `/root/autodl-tmp/EmbodiedAI/vendor/IsaacLab` for official
+  scripts/examples, but install the four packages from the locked commit rather than running an
+  unconstrained `isaaclab.sh --install` that could drift the environment.
+- Synchronize the complete Isaac Sim 5.1.0, Isaac Lab 2.3.2, PyTorch 2.7 cu128 stack to
+  `/root/autodl-tmp/EmbodiedAI/envs/isaac` with `--locked`; then run package consistency and
+  inventory checks before importing native components.
+- Run the Isaac Sim Compatibility Checker, Isaac Sim/Lab imports, PyTorch CUDA availability,
+  RTX 5090 capability/kernel execution, and a minimal headless `SimulationApp` lifecycle.
+- Test a small PhysX stage, camera/RTX rendering, a Franka scene, a small vectorized Isaac Lab
+  environment, and one bounded RSL-RL training smoke run. WebRTC GUI streaming is optional and
+  comes only after headless rendering passes.
+- Record lock and source hashes, package inventory, logs, timings, peak RAM/VRAM,
+  driver/runtime versions, cache locations, and disk use.
 
-Exit gate: deterministic smoke tests pass from a fresh shell.
+Exit gate: the locked environment is installed and deterministic Isaac Sim/Isaac Lab/CUDA
+smoke tests pass from a fresh GPU-mode shell.
 
-### Stage 5 — Install and validate the VLA environment
+Result:
 
-- Install pinned LeRobot/SmolVLA, PyTorch/TorchCodec, and only the required extras.
-- Validate imports, CUDA execution, video decode fallback, a tiny dataset round trip, and SmolVLA checkpoint inference.
-- Estimate 32 GiB VRAM fit before fine-tuning; start with LoRA/PEFT if full fine-tuning is not justified.
+- `env/isaac/uv.lock` revalidated at SHA-256
+  `997119551e29b5a014feb2fdb872e2d1b1bb2a3420f039dcee79a2c351f61bf1`, and the
+  220-package Python 3.11.16 environment was synchronized to
+  `/root/autodl-tmp/EmbodiedAI/envs/isaac`. Final key versions are Isaac Sim 5.1.0.0,
+  Isaac Lab v2.3.2, PyTorch 2.7.0+cu128, torchvision/torchaudio 0.22.0/2.7.0+cu128,
+  NumPy 1.26.0, and RSL-RL 3.1.2.
+- Isaac Lab's four Git-subdirectory wheels preserve the dependency lock but do not preserve the
+  Omniverse extension layout expected by upstream `__init__.py` files. The official installer uses
+  editable installs for this reason. `scripts/bootstrap/install_isaaclab_editable.sh` now verifies
+  the clean source checkout at commit `37ddf626871758333d6ed89cf64ad702aef127d0`, revalidates the
+  lock, and replaces only those four packages with `--no-deps` editable installs. Run
+  `embodiedai_isaaclab_install` after every `embodiedai_uv_sync isaac`; dependency versions remain
+  owned by the lock.
+- The official compatibility checker passed with driver 580.105.08, Ubuntu 22.04.5, 32 GiB-class
+  RTX 5090 VRAM, and no display. PyTorch reported CUDA 12.8, cuDNN 9.7.1, capability `(12, 0)`,
+  `sm_120`, and completed a CUDA matrix operation.
+- Bounded tests passed: PhysX plus a 64x64 offscreen RTX camera in 29 seconds (peak 3,215 MiB
+  VRAM); `Isaac-Lift-Cube-Franka-v0` with four CUDA environments and 16 steps in 13-14 seconds
+  (peak process RSS 2,974,196 KiB and 1,817 MiB VRAM); and one RSL-RL Cartpole iteration with
+  16 environments/256 timesteps in 18 seconds (peak 2,807 MiB VRAM).
+- FastAPI 0.115.7 plus Starlette 0.45.3 completed an ASGI request, and private WebRTC extensions
+  started their streaming server before a two-environment Cartpole test passed. `uv pip check`
+  still reports Isaac Lab's incompatible `starlette==0.49.1` metadata declaration; this is the
+  single intentional lock override described above, now runtime-covered rather than unresolved.
+- Direct PyPI downloads were unreliable. Seven exact lock-addressed wheels were fetched through
+  the Tsinghua mirror into an external wheelhouse and SHA-256 verified before local installation;
+  a normal `uv sync --locked` then converged without lock changes. `/etc/network_turbo` was used
+  temporarily to populate Franka assets from CloudFront and was unset afterward. No proxy setting
+  was persisted.
+- Final state: 506 GiB remains free on the data disk; the Isaac environment is about 19 GiB and
+  the shared uv cache about 25 GiB. Miniconda base history retained SHA-256
+  `f02020941438832c53f99164fba644e32d36356f517a872aa887aa29759fb65f`; driver 580.105.08 is
+  unchanged; `CUDA_HOME`, `LD_LIBRARY_PATH`, and `ROS_DISTRO` remain unset in the project shell.
+  Detailed logs and the final package inventory are under
+  `/root/autodl-tmp/EmbodiedAI/runs/bootstrap/`.
 
-Exit gate: one reproducible inference and one bounded training smoke test pass.
+### Stage 5 — Install and validate the VLA environment in GPU mode (completed 2026-08-21)
+
+- Repeat the GPU-mode resource audit, confirm at least 100 GiB remains free on the data disk,
+  and verify all uv, Hugging Face, Torch, compiler, W&B, model, dataset, and temporary paths
+  point to `/root/autodl-tmp/EmbodiedAI`.
+- Revalidate `env/vla/uv.lock`, then synchronize the pinned LeRobot 0.6.0 SmolVLA,
+  training/PEFT, PyTorch 2.8 cu128, torchvision/torchaudio, TorchCodec 0.7.x, and NumPy 2.2.x
+  stack to `/root/autodl-tmp/EmbodiedAI/envs/vla` with `--locked`.
+- Run package consistency and inventory checks, then validate LeRobot/SmolVLA imports, PyTorch
+  CUDA and RTX 5090 kernel execution, TorchCodec/FFmpeg behavior with a documented CPU fallback,
+  and one tiny dataset round trip.
+- Download only the reviewed SmolVLA checkpoint into the external model/cache paths, then run
+  one reproducible inference and one bounded LoRA/PEFT training step.
+- Measure the 32 GiB VRAM fit before proposing longer fine-tuning; do not begin a full training
+  run as part of this validation stage.
+
+Exit gate: the locked environment is installed and one reproducible GPU inference, media-path
+check, dataset round trip, and bounded training smoke test pass from a fresh GPU-mode shell.
+
+Result:
+
+- `env/vla/uv.lock` revalidated at SHA-256
+  `136754fe057383cfff64a59dc7bb96668f83ad94004a09760ec70a496847d873`, and the
+  107-package Python 3.12.14 environment was synchronized to
+  `/root/autodl-tmp/EmbodiedAI/envs/vla`. `uv pip check` reports no incompatibilities. Key
+  versions are LeRobot 0.6.0, PyTorch 2.8.0+cu128, torchvision 0.23.0+cu128, torchaudio
+  2.8.0+cu128, TorchCodec 0.7.0+cu128, NumPy 2.2.6, Transformers 5.5.4, PEFT 0.20.0,
+  Accelerate 1.14.0, and Datasets 4.8.5.
+- CUDA imports and a matrix operation passed on the RTX 5090. PyTorch reports CUDA 12.8,
+  cuDNN 9.10.2, capability `(12, 0)`, and a wheel architecture list containing `sm_120`.
+- TorchCodec initially exposed a missing host `libavdevice.so.58`; Ubuntu's `ffmpeg`
+  `7:4.4.2-0ubuntu0.22.04.1` package was installed without modifying any Python environment,
+  CUDA component, or NVIDIA driver. TorchCodec then decoded a four-frame 64x64 H.264 fixture
+  on CPU. CPU decode is the accepted Stage 5 media baseline; hardware video decode is deferred.
+- A three-frame, one-episode synthetic LeRobot dataset was written, explicitly finalized,
+  reopened, and value-checked below `/root/autodl-tmp/EmbodiedAI/datasets/stage5`. LeRobot 0.6.0
+  buffers metadata and Parquet writers, so `finalize()` is required before an immediate reload.
+- The reviewed `lerobot/smolvla_base` checkpoint is pinned to immutable revision
+  `c83c3163b8ca9b7e67c509fffd9121e66cb96205`. Its 906,712,520-byte safetensors file matches
+  SHA-256 `7cd549ac2351fb069c0ddb3c34ad2d09cfc92b56a15dccdfc2e41467aaca01eb`.
+  The tokenizer/config dependency `HuggingFaceTB/SmolVLM2-500M-Video-Instruct` is pinned to
+  revision `7b375e1b73b11138ff12fe22c8f2822d8fe03467`; only its configuration/tokenizer files are
+  needed because the complete SmolVLA checkpoint supplies the model weights.
+- Forced-offline checkpoint loading produced a finite `(1, 6)` CUDA inference result. The
+  policy's internal peak allocation/reservation was 1,209.67/1,252 MiB; external `nvidia-smi`
+  sampling observed 1,861 MiB maximum total GPU use.
+- One official LeRobot `wrap_with_peft` LoRA step completed with rank 2. It trained 92,832 of
+  450,139,008 parameters (about 0.0206%); all 74 trainable tensors had finite gradients and were
+  updated. Internal peak allocation/reservation was 1,286.53/1,344 MiB, while external sampling
+  observed 1,963 MiB maximum total GPU use. The small adapter artifact lives under the external
+  checkpoint directory, not Git.
+- Reproducible checks are recorded in `scripts/data/lerobot_dataset_smoke.py` and
+  `scripts/train/smolvla_stage5_smoke.py`. Detailed inventories, statuses, GPU samples, and logs
+  are under `/root/autodl-tmp/EmbodiedAI/runs/bootstrap/`.
+- Direct downloads stalled; `/etc/network_turbo` was enabled temporarily for the locked sync and
+  reviewed model downloads, then unset. Final state retains about 490 GiB free on the data disk;
+  the VLA environment is 7.2 GiB, uv cache 32 GiB, and model directory 870 MiB. Miniconda base,
+  NVIDIA driver 580.105.08, global CUDA/cuDNN paths, and global ROS state remain unchanged.
 
 ### Stage 6 — Integrate demonstrations and policy evaluation
 
@@ -279,13 +414,15 @@ The Stage 0 approval accepted:
 4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
 
-Next review gate: approve or amend Stage 4 before any Isaac Sim/Isaac Lab packages are
-installed or any GPU/simulator smoke test is run.
+Next review gate: review the completed Stage 5 evidence, then explicitly approve or amend Stage 6
+before generating Isaac demonstrations or implementing the simulation-to-policy integration.
+Stage 5 approval does not authorize Stage 6.
 
 ## 8. References
 
 - [Isaac Lab local installation and 5.1 requirements](https://isaac-sim.github.io/IsaacLab/main/source/setup/installation/index.html)
 - [Isaac Lab releases](https://github.com/isaac-sim/IsaacLab/releases)
+- [Isaac Lab v2.3.2 source tag](https://github.com/isaac-sim/IsaacLab/tree/v2.3.2)
 - [Isaac Lab v2.3.1/v2.3.0 release notes (Isaac Sim 5.1 baseline)](https://isaac-sim.github.io/IsaacLab/v2.3.1/source/refs/release_notes.html)
 - [Isaac Sim 5.1 Python environment](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/installation/install_python.html)
 - [Isaac Sim 5.1 ROS 2 compatibility](https://docs.isaacsim.omniverse.nvidia.com/5.1.0/installation/install_ros.html)
@@ -302,4 +439,14 @@ installed or any GPU/simulator smoke test is run.
 - 2026-08-17: Initial proposal recorded after read-only audit. No packages installed or modified. Awaiting review.
 - 2026-08-17: Re-audited after restart in GPU mode. Confirmed one usable RTX 5090, driver 580.105.08, CUDA capability 12.0, 25-CPU quota, 90 GiB RAM, and 45 GiB shared memory. Removed the former hardware blocker and recorded invalid thread-count variables. No packages installed or modified; plan still awaits review.
 - 2026-08-20: Recorded explicit Stage 0 approval and authorization for Stage 2 and Stage 3 only.
-- 2026-08-20: Completed Stage 2 repository/storage bootstrap and Stage 3 uv definitions, lock resolution, and lock review. Stages 4-8 remain unapproved.
+- 2026-08-20: Completed Stage 2 repository/storage bootstrap and initial Stage 3 uv definitions, lock resolution, and lock review. Stages 4-8 remain unapproved.
+- 2026-08-20: Considered an A/B split for no-GPU installation and GPU validation, then cancelled it because the no-GPU allocation cannot reliably meet CPU/RAM installation needs. Stage 4 and Stage 5 now each install and validate entirely in GPU mode.
+- 2026-08-20: Added Isaac Lab v2.3.2 commit `37ddf626871758333d6ed89cf64ad702aef127d0` core/assets/tasks/RSL-RL source packages to the Isaac uv definition and lock before Stage 4. No environment was synchronized or installed.
+- 2026-08-20: Completed approved Stage 4 in GPU mode. Installed the locked Isaac Sim/Lab stack,
+  added the exact-source editable Isaac Lab bootstrap required by upstream extension layout, and
+  passed compatibility, CUDA, Vulkan/RTX camera, Franka/vectorization, RSL-RL, FastAPI/Starlette,
+  and private WebRTC startup tests. Stage 5 remains unapproved and unmodified.
+- 2026-08-21: Completed approved Stage 5 in GPU mode. Installed the locked VLA stack, added the
+  Ubuntu FFmpeg runtime required by TorchCodec, pinned and checksum-verified the reviewed SmolVLA
+  model, and passed CUDA/import, CPU media decode, dataset round-trip, offline inference, and
+  bounded LoRA/PEFT optimizer-step tests. Stage 6 remains unapproved and unmodified.

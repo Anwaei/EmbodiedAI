@@ -100,6 +100,13 @@ embodiedai_uv_sync() {
     UV_PROJECT_ENVIRONMENT="$runtime" uv sync --project "$project" --locked
 }
 
+# Isaac Lab's Python packages are also Omniverse extensions. Their upstream
+# runtime layout requires editable installs from the exact locked source tree.
+# Re-run this after every embodiedai_uv_sync isaac.
+embodiedai_isaaclab_install() {
+    "$EMBODIEDAI_REPO/scripts/bootstrap/install_isaaclab_editable.sh"
+}
+
 embodiedai_activate() {
     local runtime
     runtime="$(_embodiedai_env_runtime "$1")" || return

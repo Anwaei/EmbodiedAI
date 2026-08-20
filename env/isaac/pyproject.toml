@@ -4,6 +4,10 @@ version = "0.1.0"
 requires-python = ">=3.11,<3.12"
 dependencies = [
     "isaacsim[all,extscache]==5.1.0",
+    "isaaclab==0.54.2",
+    "isaaclab-assets==0.2.4",
+    "isaaclab-rl[rsl-rl]==0.4.7",
+    "isaaclab-tasks==0.11.12",
     "torch==2.7.0",
     "torchaudio==2.7.0",
     "torchvision==0.22.0",
@@ -12,13 +16,23 @@ dependencies = [
 [tool.uv]
 package = false
 environments = ["sys_platform == 'linux' and platform_machine == 'x86_64'"]
-override-dependencies = ["pywin32==306; sys_platform == 'win32'"]
+override-dependencies = [
+    "pywin32==306; sys_platform == 'win32'",
+    "starlette==0.45.3",
+]
 
 [tool.uv.sources]
 isaacsim = { index = "nvidia-isaac" }
+isaaclab = { git = "https://github.com/isaac-sim/IsaacLab.git", rev = "37ddf626871758333d6ed89cf64ad702aef127d0", subdirectory = "source/isaaclab" }
+isaaclab-assets = { git = "https://github.com/isaac-sim/IsaacLab.git", rev = "37ddf626871758333d6ed89cf64ad702aef127d0", subdirectory = "source/isaaclab_assets" }
+isaaclab-rl = { git = "https://github.com/isaac-sim/IsaacLab.git", rev = "37ddf626871758333d6ed89cf64ad702aef127d0", subdirectory = "source/isaaclab_rl" }
+isaaclab-tasks = { git = "https://github.com/isaac-sim/IsaacLab.git", rev = "37ddf626871758333d6ed89cf64ad702aef127d0", subdirectory = "source/isaaclab_tasks" }
 torch = { index = "pytorch-cu128" }
 torchaudio = { index = "pytorch-cu128" }
 torchvision = { index = "pytorch-cu128" }
+
+[tool.uv.extra-build-dependencies]
+flatdict = ["setuptools<82"]
 
 [[tool.uv.index]]
 name = "pytorch-cu128"
