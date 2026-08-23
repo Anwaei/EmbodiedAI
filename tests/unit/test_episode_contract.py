@@ -1,32 +1,118 @@
-import pytest
+"""Unit tests for dependency-light episode metadata contracts."""
 
-from embodied_ai.contracts import EPISODE_SCHEMA_VERSION, EpisodeManifest
+import json
+import unittest
+from dataclasses import replace
+
+from embodied_ai.contracts import (
+    EPISODE_SCHEMA_VERSION,
+    ActionComponent,
+    ActionRepresentation,
+    ActionSchema,
+    DataType,
+    EpisodeManifest,
+    EpisodeMetadata,
+    EpisodeOutcome,
+    EpisodeProvenance,
+    ObservationComponent,
+    ObservationField,
+    ObservationKind,
+    ObservationSchema,
+    PayloadFile,
+)
+
+_DIGEST_A = "a" * 64
+_DIGEST_B = "b" * 64
 
 
-def test_episode_manifest_accepts_valid_boundary_metadata() -> None:
-    manifest = EpisodeManifest(
+def make_metadata(outcome: EpisodeOutcome = EpisodeOutcome.SUCCESS) -> EpisodeMetadata:
+    observation_schema = ObservationSchema(
+        fields=(
+            ObservationField(
+                key="robot.joint_position",
+                kind=ObservationKind.STATE,
+                shape=(1,),
+                dtype=DataType.FLOAT32,
+                axes=("component",),
+                components=(ObservationComponent("panda_joint1", "rad"),),
+            ),
+        )
+    )
+    action_schema = ActionSchema(
+        representation=ActionRepresentation.JOINT_POSITION,
+        components=(ActionComponent("panda_joint1", "rad", -2.9, 2.9),),
+        control_hz=20.0,
+    )
+    reason = None if outcome is EpisodeOutcome.SUCCESS else "time_limit"
+    return EpisodeMetadata(
         episode_id="episode-000001",
         task="pick-and-place",
         robot="franka-panda",
-        observation_keys=("camera.front", "robot.joint_state"),
-        action_dimension=7,
-        control_hz=20.0,
+        scene="table-cube-v1",
+        random_seed=7,
+        observation_schema=observation_schema,
+        action_schema=action_schema,
+        step_count=2,
+        start_time_ns=0,
+        end_time_ns=50_000_000,
+        outcome=outcome,
+        termination_reason=reason,
+        payloads=(
+            PayloadFile("actions/data.npy", "application/x-npy", 128, _DIGEST_A),
+            PayloadFile(
+                "actions/timestamps_ns.npy", "application/x-npy", 96, _DIGEST_B
+            ),
+        ),
+        provenance=EpisodeProvenance(
+            simulator_name="Isaac Sim",
+            simulator_version="5.1.0",
+            repository_revision="173f55b",
+            configuration_revision="stage6-default-v1",
+            environment_lock_sha256="c" * 64,
+        ),
     )
 
-    assert manifest.schema_version == EPISODE_SCHEMA_VERSION
+
+class EpisodeContractTest(unittest.TestCase):
+    def test_manifest_alias_and_json_round_trip(self) -> None:
+        metadata = make_metadata()
+        encoded = json.loads(json.dumps(metadata.to_dict()))
+
+        self.assertIs(EpisodeManifest, EpisodeMetadata)
+        self.assertEqual(metadata.schema_version, EPISODE_SCHEMA_VERSION)
+        self.assertEqual(EpisodeMetadata.from_dict(encoded), metadata)
+
+    def test_additive_v1_fields_are_accepted(self) -> None:
+        encoded = make_metadata().to_dict()
+        encoded["future_optional_field"] = {"value": 1}
+
+        self.assertEqual(EpisodeMetadata.from_dict(encoded), make_metadata())
+
+    def test_failure_and_truncation_require_a_reason(self) -> None:
+        for outcome in (EpisodeOutcome.FAILURE, EpisodeOutcome.TRUNCATED):
+            with self.subTest(outcome=outcome):
+                valid = make_metadata(outcome)
+                with self.assertRaisesRegex(ValueError, "termination_reason"):
+                    replace(valid, termination_reason=None)
+
+    def test_payload_paths_are_relative_and_digests_are_strict(self) -> None:
+        with self.assertRaisesRegex(ValueError, "relative POSIX"):
+            PayloadFile("../escape.npy", "application/x-npy", 1, _DIGEST_A)
+        with self.assertRaisesRegex(ValueError, "relative POSIX"):
+            PayloadFile("actions\\data.npy", "application/x-npy", 1, _DIGEST_A)
+        with self.assertRaisesRegex(ValueError, "relative POSIX"):
+            PayloadFile(".", "application/x-npy", 1, _DIGEST_A)
+        with self.assertRaisesRegex(ValueError, "SHA-256"):
+            PayloadFile("actions.npy", "application/x-npy", 1, "not-a-digest")
+
+    def test_time_range_and_step_count_are_validated(self) -> None:
+        valid = make_metadata()
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            replace(valid, end_time_ns=-1)
+
+        with self.assertRaisesRegex(ValueError, "positive integer"):
+            replace(valid, step_count=0)
 
 
-@pytest.mark.parametrize("field,value", [("action_dimension", 0), ("control_hz", 0.0)])
-def test_episode_manifest_rejects_non_positive_control_values(field: str, value: float) -> None:
-    values = {
-        "episode_id": "episode-000001",
-        "task": "pick-and-place",
-        "robot": "franka-panda",
-        "observation_keys": ("robot.joint_state",),
-        "action_dimension": 7,
-        "control_hz": 20.0,
-    }
-    values[field] = value
-
-    with pytest.raises(ValueError):
-        EpisodeManifest(**values)
+if __name__ == "__main__":
+    unittest.main()
