@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Launch and inspect the Stage 6 Franka task skeleton without recording an episode."""
+"""Launch the Stage 6 Franka skeleton and save one rendered camera observation."""
 
 from __future__ import annotations
 
 import argparse
+import os
+from pathlib import Path
 
 from isaaclab.app import AppLauncher
 
@@ -11,6 +13,20 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--num_envs", type=int, default=1)
 parser.add_argument("--steps", type=int, default=2)
+default_artifact_root = Path(
+    os.environ.get("EMBODIEDAI_ARTIFACTS", "/root/autodl-tmp/EmbodiedAI/artifacts")
+)
+parser.add_argument(
+    "--png_path",
+    type=Path,
+    default=(
+        default_artifact_root
+        / "stage6"
+        / "franka_pick_place_skeleton"
+        / "camera_front_env0.png"
+    ),
+    help="output path for the first environment's final front-camera observation",
+)
 AppLauncher.add_app_launcher_args(parser)
 parser.set_defaults(enable_cameras=True, headless=True)
 args_cli = parser.parse_args()
@@ -20,6 +36,7 @@ simulation_app = app_launcher.app
 
 import gymnasium as gym
 import torch
+from torchvision.io import write_png
 
 import embodied_ai.sim.tasks  # noqa: F401
 from embodied_ai.contracts.tasks.franka_pick_place import (
@@ -61,6 +78,27 @@ def _validate_observations(observations: dict[str, object], num_envs: int) -> No
             raise RuntimeError(f"observation {field.key!r} contains non-finite values")
 
 
+def _save_front_camera_png(
+    observations: dict[str, object], output_path: Path
+) -> Path:
+    policy = observations["policy"]
+    if not isinstance(policy, dict):
+        raise RuntimeError("validated policy observations unexpectedly changed type")
+
+    term_name = CONTRACT_OBSERVATION_TERM_MAP["camera.front.rgb"]
+    camera_batch = policy[term_name]
+    if not isinstance(camera_batch, torch.Tensor):
+        raise RuntimeError("validated front-camera observation unexpectedly changed type")
+
+    image = camera_batch[0].detach().to(device="cpu").contiguous()
+    resolved_path = output_path.expanduser().resolve()
+    resolved_path.parent.mkdir(parents=True, exist_ok=True)
+    write_png(image, str(resolved_path), compression_level=6)
+    if not resolved_path.is_file() or resolved_path.stat().st_size == 0:
+        raise RuntimeError(f"PNG writer did not create a non-empty file: {resolved_path}")
+    return resolved_path
+
+
 def main() -> None:
     if args_cli.num_envs < 1:
         raise ValueError("--num_envs must be positive")
@@ -93,6 +131,8 @@ def main() -> None:
         if not expected_scene_keys.issubset(scene_keys):
             raise RuntimeError(f"missing scene entities: {expected_scene_keys - scene_keys}")
 
+        png_path = _save_front_camera_png(observations, args_cli.png_path)
+
         print(
             "STAGE6_TASK_SKELETON_OK",
             f"task={TASK_ID}",
@@ -100,6 +140,7 @@ def main() -> None:
             f"steps={args_cli.steps}",
             f"action_dim={FRANKA_PICK_PLACE_ACTION_SCHEMA.dimension}",
             "camera_shape=(3,224,224)",
+            f"png={png_path}",
             flush=True,
         )
     finally:

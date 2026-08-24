@@ -109,7 +109,7 @@ class FrankaPickPlaceSceneCfg(InteractiveSceneCfg):
             clipping_range=(0.1, 10.0),
         ),
         offset=TiledCameraCfg.OffsetCfg(
-            pos=(1.0, 0.0, 0.40),
+            pos=(1.4, 0.0, 1.0),
             rot=(0.35355, -0.61237, -0.61237, 0.35355),
             convention="ros",
         ),

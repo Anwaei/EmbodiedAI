@@ -83,12 +83,16 @@ Run from an explicitly configured project shell:
 source scripts/bootstrap/project_env.sh
 PYTHONPATH=src "$EMBODIEDAI_ENVS/isaac/bin/python" \
   scripts/sim/franka_pick_place_skeleton_smoke.py \
-  --headless --enable_cameras --device cuda:0 --num_envs 1 --steps 2
+  --headless --enable_cameras --device cuda:0 --num_envs 1 --steps 2 \
+  --png_path \
+  "$EMBODIEDAI_ARTIFACTS/stage6/franka_pick_place_skeleton/camera_front_env0.png"
 ```
 
 This check creates the registered environment, resets it, validates all scene entities and
-contract-facing observation/action shapes, steps zero actions, and closes the simulator. It
-does not record an episode and is not the later end-to-end Stage 6 smoke test.
+contract-facing observation/action shapes, steps zero actions, and saves the final front-camera
+observation from environment zero as a PNG before closing the simulator. If `--png_path` is
+omitted, the same location under `EMBODIEDAI_ARTIFACTS` is used by default. It does not record
+an episode and is not the later end-to-end Stage 6 smoke test.
 
 On 2026-08-23 this check passed on the RTX 5090 allocation with driver 580.105.08 using one
 CUDA environment and two steps. The action manager resolved dimensions 6 + 1, and the
