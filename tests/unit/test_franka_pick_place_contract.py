@@ -8,10 +8,14 @@ from embodied_ai.contracts.tasks.franka_pick_place import (
     CAMERA_HEIGHT,
     CAMERA_WIDTH,
     CONTROL_HZ,
+    CUBE_RESET_POSITION_ENV_M,
+    FAILURE_MINIMUM_Z_ENV_M,
     FRANKA_PICK_PLACE_ACTION_SCHEMA,
     FRANKA_PICK_PLACE_OBSERVATION_SCHEMA,
+    GOAL_POSITION_ENV_M,
     IK_ROTATION_SCALE_RAD,
     IK_TRANSLATION_SCALE_M,
+    SUCCESS_POSITION_TOLERANCE_M,
 )
 
 
@@ -61,6 +65,18 @@ class FrankaPickPlaceContractTest(unittest.TestCase):
         self.assertGreater(IK_ROTATION_SCALE_RAD, 0.0)
         encoded = json.loads(json.dumps(schema.to_dict()))
         self.assertEqual(ActionSchema.from_dict(encoded), schema)
+
+    def test_reset_and_goal_are_distinct_and_above_the_failure_plane(self) -> None:
+        squared_distance = sum(
+            (reset - goal) ** 2
+            for reset, goal in zip(
+                CUBE_RESET_POSITION_ENV_M, GOAL_POSITION_ENV_M, strict=True
+            )
+        )
+
+        self.assertGreater(squared_distance**0.5, SUCCESS_POSITION_TOLERANCE_M)
+        self.assertGreater(CUBE_RESET_POSITION_ENV_M[2], FAILURE_MINIMUM_Z_ENV_M)
+        self.assertGreater(GOAL_POSITION_ENV_M[2], FAILURE_MINIMUM_Z_ENV_M)
 
 
 if __name__ == "__main__":

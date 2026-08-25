@@ -23,10 +23,14 @@ from embodied_ai.contracts.tasks.franka_pick_place import (
     CAMERA_HEIGHT,
     CAMERA_WIDTH,
     CONTROL_HZ,
+    CUBE_RESET_POSITION_ENV_M,
+    GOAL_MARKER_SIZE_M,
+    GOAL_POSITION_ENV_M,
     IK_ROTATION_SCALE_RAD,
     IK_TRANSLATION_SCALE_M,
 )
 
+from . import evaluation as task_evaluation
 from . import mdp as task_mdp
 
 ROBOT_JOINT_NAMES = [
@@ -76,7 +80,7 @@ class FrankaPickPlaceSceneCfg(InteractiveSceneCfg):
 
     cube = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Cube",
-        init_state=RigidObjectCfg.InitialStateCfg(pos=(0.50, 0.0, 0.03)),
+        init_state=RigidObjectCfg.InitialStateCfg(pos=CUBE_RESET_POSITION_ENV_M),
         spawn=sim_utils.CuboidCfg(
             size=(0.05, 0.05, 0.05),
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
@@ -92,6 +96,23 @@ class FrankaPickPlaceSceneCfg(InteractiveSceneCfg):
             ),
             visual_material=sim_utils.PreviewSurfaceCfg(
                 diffuse_color=(0.12, 0.45, 0.80)
+            ),
+        ),
+    )
+
+    goal_marker = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/GoalMarker",
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(
+                GOAL_POSITION_ENV_M[0],
+                GOAL_POSITION_ENV_M[1],
+                GOAL_MARKER_SIZE_M[2] / 2.0,
+            )
+        ),
+        spawn=sim_utils.CuboidCfg(
+            size=GOAL_MARKER_SIZE_M,
+            visual_material=sim_utils.PreviewSurfaceCfg(
+                diffuse_color=(0.10, 0.65, 0.20)
             ),
         ),
     )
@@ -181,7 +202,7 @@ class ObservationsCfg:
             },
         )
         cube_position = ObsTerm(
-            func=isaac_mdp.root_pos_w,
+            func=task_mdp.cube_position_env,
             params={"asset_cfg": SceneEntityCfg("cube")},
         )
         camera_front_rgb = ObsTerm(
@@ -198,9 +219,9 @@ class ObservationsCfg:
 
 @configclass
 class EventCfg:
-    """Generic default-state reset; task-specific deterministic reset is deferred."""
+    """Task-specific reset with no random sampling."""
 
-    reset_scene = EventTerm(func=isaac_mdp.reset_scene_to_default, mode="reset")
+    reset_scene = EventTerm(func=task_mdp.reset_franka_pick_place, mode="reset")
 
 
 @configclass
@@ -212,14 +233,16 @@ class RewardsCfg:
 
 @configclass
 class TerminationsCfg:
-    """Time-limit termination only; success/failure evaluation is deferred."""
+    """Success, bounded-workspace failure, and time-limit terminations."""
 
+    success = DoneTerm(func=task_evaluation.task_success)
+    failure = DoneTerm(func=task_evaluation.task_failure)
     time_out = DoneTerm(func=isaac_mdp.time_out, time_out=True)
 
 
 @configclass
 class FrankaPickPlaceEnvCfg(ManagerBasedRLEnvCfg):
-    """Minimal runnable task skeleton; no expert, recorder, or learned policy."""
+    """Deterministic task baseline; no expert or learned policy."""
 
     scene: FrankaPickPlaceSceneCfg = FrankaPickPlaceSceneCfg(
         num_envs=1,

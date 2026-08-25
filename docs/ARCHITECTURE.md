@@ -30,6 +30,9 @@ This boundary prevents Isaac, VLA, and ROS dependencies from contaminating each 
 ## Storage and communication
 
 - Simulator outputs immutable episodes described by `docs/DATA_FORMAT.md`.
+- The Isaac-side NPY recorder writes contract-keyed tensors and a manifest to a private
+  partial directory, then atomically publishes the complete episode. It imports neither
+  LeRobot nor the VLA training stack.
 - Training emits checkpoints plus metadata defining observations, normalization, action
   dimensions, control frequency, and source revision.
 - Online evaluation uses a narrow local RPC or ROS 2 boundary; it does not import Isaac and

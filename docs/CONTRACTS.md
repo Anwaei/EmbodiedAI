@@ -1,8 +1,8 @@
 # Stage 6 Contracts
 
-This document records the shared contract decisions introduced in Stage 6 step 1 and the
-task-specific Franka contract instance added in step 2. The deterministic controller,
-recorder, and end-to-end episode smoke test remain later steps.
+This document records the shared contract decisions introduced in Stage 6 step 1, the
+task-specific Franka contract instance added in step 2, and the Stage 6 steps 3-5 simulator
+adapter and immutable episode publication decisions.
 
 ## Boundary and dependency policy
 
@@ -91,20 +91,26 @@ portable. Payload checksums cover data files, while the manifest itself remains 
 own checksum list. `EpisodeManifest` remains an alias of `EpisodeMetadata` for compatibility
 with the earlier repository placeholder.
 
-The recorder is responsible for writing monotonically increasing observation/action
-timestamp arrays and for atomically publishing an episode directory only after all payload
-hashes are known. Payload contents and monotonicity are not checked by these dependency-light
-metadata objects; a later data validator will perform those file-level checks.
+The Isaac-side NPY recorder writes strictly increasing, synchronized observation/action
+timestamp arrays and atomically publishes an episode directory only after all payload hashes
+are known. Its companion validator checks checksums, file sizes, array shapes/dtypes,
+timestamp monotonicity, and agreement with the manifest. These runtime responsibilities stay
+outside the dependency-light metadata objects.
+
+The Stage 6 smoke records pre-action pairs: observation at time `t`, followed by the action
+issued at the same control boundary. The episode produced by the bounded zero-action smoke is
+classified as `truncated` with reason `smoke-test-step-limit`; it is structural test data, not
+a successful demonstration.
 
 ## Deferred decisions
 
-The following are explicitly outside step 1:
+The following remain deferred after steps 1-5:
 
-- camera payload codec and finalized camera calibration metadata;
-- deterministic reset, goal placement, expert control, and evaluation thresholds;
-- NumPy/video payload codecs and atomic recorder implementation;
+- production camera codec and finalized camera calibration metadata;
+- deterministic expert control and successful demonstration generation;
+- streaming/chunked recording for long episodes;
 - LeRobot feature mapping and normalization statistics;
-- Isaac Lab launch/reset/step integration and GPU validation.
+- VLA training and learned-policy inference.
 
 These decisions must build on the v1 contracts and may not introduce LeRobot imports into
 the Isaac environment.

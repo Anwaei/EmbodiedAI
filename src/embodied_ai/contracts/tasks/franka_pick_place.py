@@ -21,6 +21,16 @@ IK_ROTATION_SCALE_RAD = 0.15
 GRIPPER_OPEN_ACTION = 1.0
 GRIPPER_CLOSE_ACTION = -1.0
 
+# Task geometry and evaluation values are expressed in each replicated environment frame.
+CUBE_RESET_POSITION_ENV_M = (0.50, 0.0, 0.03)
+GOAL_POSITION_ENV_M = (0.65, -0.20, 0.03)
+GOAL_MARKER_SIZE_M = (0.11, 0.11, 0.004)
+SUCCESS_POSITION_TOLERANCE_M = 0.05
+SUCCESS_LINEAR_SPEED_TOLERANCE_M_S = 0.10
+FAILURE_X_BOUNDS_ENV_M = (0.10, 1.00)
+FAILURE_Y_BOUNDS_ENV_M = (-0.50, 0.50)
+FAILURE_MINIMUM_Z_ENV_M = -0.05
+
 _ARM_JOINT_NAMES = tuple(f"panda_joint{index}" for index in range(1, 8))
 _FINGER_JOINT_NAMES = ("panda_finger_joint1", "panda_finger_joint2")
 

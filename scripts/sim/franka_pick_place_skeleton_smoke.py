@@ -127,7 +127,13 @@ def main() -> None:
             _validate_observations(observations, args_cli.num_envs)
 
         scene_keys = set(env.unwrapped.scene.keys())
-        expected_scene_keys = {"robot", "table", "cube", "camera_front"}
+        expected_scene_keys = {
+            "robot",
+            "table",
+            "cube",
+            "goal_marker",
+            "camera_front",
+        }
         if not expected_scene_keys.issubset(scene_keys):
             raise RuntimeError(f"missing scene entities: {expected_scene_keys - scene_keys}")
 

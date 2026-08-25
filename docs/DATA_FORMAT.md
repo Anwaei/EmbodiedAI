@@ -18,14 +18,28 @@ require a new major identifier.
 episode-000001/
 ├── manifest.json
 ├── observations/
-│   ├── robot_state.npy
-│   ├── robot_state_timestamps_ns.npy
-│   ├── camera_front.mp4           # codec remains a recorder decision
-│   └── camera_front_timestamps_ns.npy
+│   ├── robot_joint_position.npy
+│   ├── robot_joint_velocity.npy
+│   ├── object_cube_position.npy
+│   ├── camera_front_rgb.npy
+│   └── timestamps_ns.npy
 └── actions/
     ├── data.npy
     └── timestamps_ns.npy
 ```
+
+Stage 6 uses one NPY payload per observation contract key. Dots and hyphens in a key are
+normalized to underscores in its filename; the complete schema in `manifest.json` remains
+the semantic source of truth. Every observation and action is sampled as a synchronized
+pre-action pair at the 20 Hz control boundary, so both timestamp arrays are identical in this
+initial recorder. Arrays have a leading `step` dimension followed by the per-step shape in
+the corresponding schema.
+
+The initial recorder intentionally buffers only a bounded short rollout in memory. It is
+appropriate for the Stage 6 smoke and short demonstrations, but long-running production
+collection must add streaming/chunking. Video encoding is also deferred; a future compatible
+recorder may replace the camera NPY payload with MP4 while retaining the declared observation
+semantics and timestamps.
 
 `manifest.json` is the serialized `EpisodeMetadata` contract and records:
 
@@ -38,8 +52,8 @@ episode-000001/
 - relative payload paths, media types, byte sizes, and SHA-256 checksums.
 
 There is no separate `metadata.json`; keeping one manifest avoids duplicated sources of
-truth. The listed codecs and filenames are the expected baseline layout, not a commitment to
-a particular array or video library in the contracts package.
+truth. NumPy remains an Isaac-side recorder dependency and is not imported by the contracts
+package.
 
 ## Invariants
 
@@ -50,6 +64,8 @@ a particular array or video library in the contracts package.
 - Failed and truncated episodes remain distinguishable from successful episodes.
 - Payload paths are normalized relative POSIX paths and every finalized payload is hashed.
 - An episode is published atomically only after all payload files and the manifest are final.
+- An existing finalized episode directory is never overwritten. A repeated episode identifier
+  is an error.
 - Conversion to LeRobot format is a validated, separate step in the VLA environment.
 - Checkpoints are accompanied by policy metadata that names the compatible schema and
   normalization statistics.

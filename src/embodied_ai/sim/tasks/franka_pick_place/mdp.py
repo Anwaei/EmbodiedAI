@@ -8,6 +8,8 @@ from isaaclab.envs import ManagerBasedEnv
 from isaaclab.envs import mdp as isaac_mdp
 from isaaclab.managers import SceneEntityCfg
 
+from .evaluation import cube_position_env
+
 
 def camera_rgb_chw(
     env: ManagerBasedEnv,
@@ -27,6 +29,12 @@ def camera_rgb_chw(
 
 
 def zero_reward(env: ManagerBasedEnv) -> torch.Tensor:
-    """Explicit placeholder until the evaluation interface is implemented."""
+    """Explicit placeholder until a training reward is approved."""
 
     return torch.zeros(env.num_envs, dtype=torch.float32, device=env.device)
+
+
+def reset_franka_pick_place(env: ManagerBasedEnv, env_ids: torch.Tensor) -> None:
+    """Restore the configured fixed scene state without random sampling."""
+
+    isaac_mdp.reset_scene_to_default(env, env_ids)

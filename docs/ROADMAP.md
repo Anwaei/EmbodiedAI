@@ -10,7 +10,7 @@
 | 3 | uv tooling, independent definitions, and lock review | Completed 2026-08-20; see `DEPENDENCY_LOCKS.md` |
 | 4 | Install and validate Isaac environment | Completed 2026-08-20; see `ENVIRONMENT.md` |
 | 5 | Install and validate VLA environment | Completed 2026-08-21; see `ENVIRONMENT.md` |
-| 6 | Demonstration-to-policy integration | In progress; steps 1-2 implemented 2026-08-23 |
+| 6 | Demonstration-to-policy integration | In progress; steps 1-5 done 2026-08-24 |
 | 7 | ROS 2 deployment boundary | Not approved |
 | 8 | Reproducibility and robustness gate | Not approved |
 
@@ -28,6 +28,8 @@
 
 ## Deferred work
 
+- Deterministic expert demonstration generation follows the structural dummy-episode smoke.
+- LeRobot conversion and VLA training remain separate, explicitly reviewed work.
 - Multi-step manipulation follows the single-step baseline.
 - OpenVLA/OpenVLA-OFT experiments follow SmolVLA.
 - World models and learned dynamics do not block the MVP.
