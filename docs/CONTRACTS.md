@@ -1,8 +1,9 @@
 # Stage 6 Contracts
 
 This document records the shared contract decisions introduced in Stage 6 step 1, the
-task-specific Franka contract instance added in step 2, and the Stage 6 steps 3-5 simulator
-adapter and immutable episode publication decisions.
+task-specific Franka contract instance added in step 2, the Stage 6 steps 3-5 simulator
+adapter and immutable episode publication decisions, and the planned additive metadata for
+step 6 expert demonstrations.
 
 ## Boundary and dependency policy
 
@@ -102,12 +103,48 @@ issued at the same control boundary. The episode produced by the bounded zero-ac
 classified as `truncated` with reason `smoke-test-step-limit`; it is structural test data, not
 a successful demonstration.
 
+## Planned expert-demonstration metadata
+
+Stage 6 step 6 will extend `EpisodeMetadata` additively while retaining
+`embodied-ai.episode/v1`. Existing structural episodes remain readable, but an episode offered
+as an expert demonstration must provide all of the following:
+
+- `task`: the existing stable machine-readable task identifier, initially
+  `franka-pick-place`. It identifies reset, goal, and evaluation semantics and must not be
+  replaced by free-form language.
+- `instruction`: the exact non-empty natural-language command used for the episode, initially
+  `Pick up the cube and place it in the goal.` It is constant for the episode and is the text
+  later mapped to the LeRobot task/instruction field.
+- `instruction_id`: a stable identifier for a wording variant, allowing several paraphrases to
+  map to one task while preserving the exact wording used for collection.
+- `instruction_language`: the language tag for the instruction, initially `en`.
+- `expert`: structured `ExpertMetadata` containing `kind`, `identifier`, `revision`, and an
+  expert-specific `configuration_revision`.
+
+The initial expert kinds are `state_machine`, `rl_policy`, and `teleoperation`. Their common
+fields have source-specific interpretations: a state machine records its controller/config
+revision, an RL expert records an immutable policy/checkpoint revision, and teleoperation
+records the control mapping and collection-session revision without requiring personal
+operator identity in the portable manifest.
+
+These fields are optional for structural smoke episodes but required together for training
+demonstrations. Expert metadata describes provenance and must not be consumed as a policy
+observation. `task`, instruction wording, and expert identity are orthogonal: changing a
+paraphrase does not create a new task, and changing the action source does not change task
+semantics.
+
+The step 6 implementation must validate non-empty normalized strings, supported expert kinds,
+and identifier/revision syntax in the dependency-light contracts layer. This is an additive
+v1 change because existing v1 readers already ignore unknown fields; any future change that
+alters the meaning of `task` or the action/observation boundary requires a new major schema.
+
 ## Deferred decisions
 
 The following remain deferred after steps 1-5:
 
 - production camera codec and finalized camera calibration metadata;
-- deterministic expert control and successful demonstration generation;
+- implementation of the reviewed expert metadata, state-machine controller, and successful
+  demonstration collection plan;
 - streaming/chunked recording for long episodes;
 - LeRobot feature mapping and normalization statistics;
 - VLA training and learned-policy inference.

@@ -1,7 +1,7 @@
 # Environment and Bootstrap Plan
 
-Status: **Stages 0, 4, and 5 approved; Stages 1-5 completed; Stages 6-8 not approved**
-Audit date: 2026-08-17 (hardware), updated 2026-08-21 after Stage 5 completion
+Status: **Stages 1-5 completed; Stage 6 steps 1-5 completed; step 6 planned but not implemented; Stages 7-8 not approved**
+Audit date: 2026-08-17 (hardware), updated 2026-08-25 for the Stage 6 step 6 plan
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
 ## 1. Constraints and decision summary
@@ -14,7 +14,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
   - LeRobot `v0.6.0` with the `smolvla` feature set, Python `3.12`, PyTorch `2.8.0+cu128`, TorchCodec `0.7.x`, NumPy `2.2.x`.
   - ROS 2 Humble on Ubuntu 22.04 using its native Python `3.10`, communicating with Isaac Sim through DDS and the Isaac Sim ROS 2 bridge.
 - The restarted container now passes the static hardware/resource preflight: one usable RTX 5090, a 25-CPU cgroup quota, 90 GiB RAM, 45 GiB shared memory, and 550 GiB on the data disk. The 30 GiB root filesystem remains intentionally code-only.
-- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 remains a separate, unapproved gate.
+- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 steps 1-5 established the contracts, task skeleton, deterministic reset/evaluation, and immutable structural episode path. Step 6 expert generation is documented but not implemented.
 - Stage 2/3 execution occurred while the leased server was in no-GPU mode; this was acceptable for lock-only work and no GPU test was attempted. The GPU-mode hardware audit above remains the acceptance baseline for the later runtime stages.
 
 ## 2. Remote-machine audit
@@ -57,7 +57,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 | Isaac compatibility check | Official checker plus headless smoke test | Official checker passed; Vulkan, PhysX, RTX camera, Isaac Lab Franka/vectorization, RSL-RL, and WebRTC startup tests passed | Pass (Stage 4) |
 | VLA runtime check | Locked install plus imports, CUDA, media, dataset, inference, and PEFT smoke tests | PyTorch cu128 runs on `sm_120`; TorchCodec CPU decode, LeRobot dataset round trip, offline SmolVLA inference, and one LoRA optimizer step passed | Pass (Stage 5) |
 
-The former no-GPU/low-resource blocker was resolved by the GPU-mode audit. Stages 4 and 5 then completed in GPU allocations. Stage 6 is the next explicit authorization gate; Stage 5 approval did not authorize simulation-to-policy integration work.
+The former no-GPU/low-resource blocker was resolved by the GPU-mode audit. Stages 4 and 5 then completed in GPU allocations. Stage 6 steps 1-5 were later completed under explicit user direction. The next review gate is the Stage 6 step 6 expert-generation implementation; this planning change does not authorize expert rollout generation or VLA training.
 
 ## 3. Proposed repository structure
 
@@ -178,7 +178,7 @@ Isaac Sim 6.0/6.0.1 and Isaac Lab 3.0 beta/develop are not selected for the MVP.
 
 ## 6. Staged bootstrap plan
 
-Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were then separately approved and completed. Stages 6-8 remain unauthorized.
+Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were then separately approved and completed. Stage 6 steps 1-5 are complete; step 6 is at documentation review only. Stages 7-8 remain unauthorized.
 
 ### GPU-mode execution policy for Stages 4 and 5
 
@@ -381,9 +381,24 @@ Result:
 
 ### Stage 6 — Integrate demonstrations and policy evaluation
 
-- Implement the versioned observation/action/episode contract.
-- Generate a tiny deterministic Isaac demonstration set, export it to LeRobot format, validate it in the VLA environment, and replay policy actions in Isaac.
-- Add dataset checksums, provenance, and task/config metadata.
+- Steps 1-5 completed the versioned observation/action/episode contracts, Franka task skeleton,
+  deterministic reset/evaluation interface, dependency boundary, and immutable NPY structural
+  episode recorder.
+- Step 6 is planned as an Isaac-side deterministic state-machine expert plus an expert-rollout
+  collector. The initial task is `franka-pick-place` and its canonical instruction is
+  `Pick up the cube and place it in the goal.`
+- Expert episodes will extend the additive v1 metadata with the exact instruction, instruction
+  variant/language, and structured expert provenance while retaining the existing stable `task`
+  identifier, payload checksums, and task/config/environment provenance.
+- The expert interface will allow state-machine, learned RL-policy, and teleoperation action
+  sources to emit the same normalized action schema. Instruction paraphrases remain separate
+  from task definitions; a task with different goal/evaluation semantics receives a new stable
+  task identifier.
+- Collection remains in the Isaac Python 3.11 environment and writes one immutable episode per
+  environment. It must not import LeRobot. LeRobot conversion, VLA dataset validation, training,
+  and policy replay remain later reviewed work in the Python 3.12 VLA environment.
+- No expert implementation, collection run, dataset generation, package change, or training is
+  authorized by this documentation-only plan.
 
 Exit gate: end-to-end pick-and-place round trip passes without cross-installing environments.
 
@@ -414,9 +429,9 @@ The Stage 0 approval accepted:
 4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
 
-Next review gate: review the completed Stage 5 evidence, then explicitly approve or amend Stage 6
-before generating Isaac demonstrations or implementing the simulation-to-policy integration.
-Stage 5 approval does not authorize Stage 6.
+Next review gate: review and explicitly approve or amend the documented Stage 6 step 6 metadata,
+expert abstraction, state-machine phases, and collection lifecycle before implementing the expert
+or generating demonstrations. LeRobot conversion and VLA training remain separate later gates.
 
 ## 8. References
 
@@ -449,4 +464,10 @@ Stage 5 approval does not authorize Stage 6.
 - 2026-08-21: Completed approved Stage 5 in GPU mode. Installed the locked VLA stack, added the
   Ubuntu FFmpeg runtime required by TorchCodec, pinned and checksum-verified the reviewed SmolVLA
   model, and passed CUDA/import, CPU media decode, dataset round-trip, offline inference, and
-  bounded LoRA/PEFT optimizer-step tests. Stage 6 remains unapproved and unmodified.
+  bounded LoRA/PEFT optimizer-step tests.
+- 2026-08-23 to 2026-08-24: Completed Stage 6 steps 1-5: dependency-light contracts, the Franka
+  task skeleton, deterministic reset/evaluation, the Isaac/VLA dependency boundary, and immutable
+  NPY structural episode publication.
+- 2026-08-25: Added the documentation-only Stage 6 step 6 plan for instruction-bearing expert
+  demonstrations, a deterministic state-machine expert, and an extensible collection interface.
+  No expert code, episode generation, package change, LeRobot conversion, or VLA training was run.

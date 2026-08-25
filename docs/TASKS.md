@@ -85,9 +85,139 @@ was approved.
 
 The following remain deferred:
 
-- deterministic expert state machine and successful demonstration generation;
-- demonstration generation and LeRobot conversion;
+- implementation of the reviewed Stage 6 step 6 deterministic expert and demonstration
+  collection plan below;
+- LeRobot conversion of the future expert demonstrations;
 - learned policy inference or VLA training.
+
+## Stage 6 step 6 plan: expert demonstration generation
+
+Status: **design only; no expert or collector implementation has been added**.
+
+### Initial scope
+
+The first expert will solve the existing `franka-pick-place` task from its deterministic reset
+and emit the unchanged normalized seven-dimensional action contract. Its canonical instruction
+is:
+
+```text
+Pick up the cube and place it in the goal.
+```
+
+The first delivery targets one reproducible successful episode from one environment. It does
+not add VLA inference, LeRobot imports, training, domain randomization, or a learned reward.
+The existing fixed scene, current-state evaluator, and immutable NPY recorder remain the
+authoritative task and storage boundaries.
+
+### Planned expert interface
+
+An Isaac-side expert interface will separate action generation from collection. Its logical
+operations are:
+
+- `reset(env, env_ids, task_context)`: initialize per-environment expert state at an episode
+  boundary;
+- `act(env, observations, task_context)`: return a batched `float32` tensor conforming exactly
+  to `FRANKA_PICK_PLACE_ACTION_SCHEMA`;
+- `metadata`: return the dependency-light expert kind, identifier, revision, and configuration
+  revision written to the episode manifest.
+
+`task_context` will identify the task and selected instruction and expose the task parameters
+needed by the expert. The state-machine expert may read privileged simulator state such as the
+end-effector pose, cube pose, goal pose, and gripper state. Those values guide demonstration
+generation but do not automatically become VLA policy observations. The expert must use normal
+actions and physics; it may not teleport the cube or write a successful terminal state directly.
+
+The initial interface is batched even though the first collector uses one environment. Each
+environment owns an independent state-machine phase, phase timer, and terminal status. This
+preserves a later path to vectorized collection without changing the public action contract.
+
+### Planned deterministic state machine
+
+The initial controller will use a fixed downward grasp orientation, proportional clipped
+task-space deltas, explicit tolerances, and a maximum duration for every phase. The planned
+phases are:
+
+1. `move_above_cube`: open the gripper and move to a pre-grasp position above the cube.
+2. `descend_to_grasp`: descend while retaining the fixed grasp orientation.
+3. `close_gripper`: close the fingers and wait a fixed settling interval.
+4. `lift_cube`: raise the tool and require the cube to rise above a configured lift threshold.
+5. `move_above_goal`: translate the grasped cube to a pre-place position above the goal.
+6. `descend_to_place`: lower the cube to the configured placement height.
+7. `open_gripper`: release the cube and wait for its speed to settle.
+8. `retreat`: move the tool clear of the object, then rely on the public task evaluator for the
+   final success decision.
+9. `done` or `failed`: stop producing rollout actions after success or a phase timeout/failure.
+
+Transition thresholds, gains, hover heights, settle durations, and per-phase limits will be
+committed configuration rather than scattered constants. Actions will be clipped to `[-1, 1]`;
+the existing Isaac action adapter remains solely responsible for applying the 0.05 m translation
+and 0.15 rad rotation scales. State-machine phase completion is internal control state and must
+not replace the task's public success/failure evaluation.
+
+### Planned collection lifecycle
+
+The collector, rather than the expert, will own the environment and recorder lifecycle:
+
+```text
+select task + instruction + expert
+  -> create/reset Isaac environment
+  -> reset expert state
+  -> record pre-action observation/action pairs at 20 Hz
+  -> step Isaac Lab and evaluate the current state
+  -> finalize success, failure, or truncated episode
+  -> publish one immutable episode directory
+```
+
+Every collected training demonstration will record the stable task ID, exact instruction text,
+instruction variant ID/language, and expert provenance described in `CONTRACTS.md`. The raw
+collection root may retain failed or truncated attempts for diagnosis, but the later VLA
+conversion will select successful episodes by default and will not rewrite raw episodes.
+
+The first collector will preserve the currently accepted lifecycle of one explicit reset per
+environment instance. A repeated-reset regression must be resolved before collecting multiple
+sequential episodes in one process. Until then, repeated deterministic collection may use one
+fresh process/environment lifecycle per episode. Future vectorized collection will maintain one
+`NpyEpisodeRecorder` and one episode directory per environment; it will not add an environment
+batch dimension to one episode.
+
+### Extension model
+
+The three extension axes are deliberately independent:
+
+- **Different instruction, same task:** instruction variants such as `Move the cube to the green
+  target.` retain `task=franka-pick-place`, the same reset/evaluator, and the same action schema.
+  The selected exact text and variant ID are stored per episode.
+- **Different task:** a command such as `Place the cube on the left side of the table.` receives a
+  distinct stable task identifier and task definition because its target/evaluation semantics
+  differ. A task definition binds a Gym environment/config, reset parameters, evaluator, allowed
+  instruction variants, and compatible action/observation schemas.
+- **Different expert:** `state_machine`, `rl_policy`, and `teleoperation` implementations share
+  the same reset/act/metadata boundary. Learned experts additionally pin a checkpoint revision;
+  teleoperation pins its device/control mapping and session revision. The collector does not
+  branch on expert internals.
+
+This means language paraphrases do not duplicate task logic, new tasks do not require recorder
+changes, and new expert sources do not alter the episode observation/action representation.
+
+### Planned repository additions
+
+The implementation review is expected to introduce modules with responsibilities equivalent to:
+
+```text
+src/embodied_ai/sim/experts/
+├── base.py                         # expert protocol and step result
+└── franka_pick_place_state_machine.py
+src/embodied_ai/sim/collection/
+└── expert_rollout.py               # rollout/recorder lifecycle
+configs/sim/franka_pick_place/
+└── state_machine_expert.toml       # gains, thresholds, heights, and phase limits
+scripts/sim/
+└── collect_franka_pick_place_expert.py
+```
+
+Exact filenames may be adjusted during implementation review, but dependency ownership may not:
+all simulator control and collection code remains in the Isaac environment, while LeRobot
+conversion remains a later VLA-environment step.
 
 ### Bounded skeleton check
 

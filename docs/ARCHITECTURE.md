@@ -20,7 +20,8 @@ This boundary prevents Isaac, VLA, and ROS dependencies from contaminating each 
 ## Repository modules
 
 - `src/embodied_ai/contracts`: dependency-light data and policy interface schemas.
-- `src/embodied_ai/sim`: Isaac Lab tasks, scenes, sensors, recording, and randomization.
+- `src/embodied_ai/sim`: Isaac Lab tasks, scenes, sensors, experts, demonstration collection,
+  recording, and randomization.
 - `src/embodied_ai/data`: dataset validation and LeRobot conversion.
 - `src/embodied_ai/policies`: policy metadata and LeRobot/SmolVLA adapters.
 - `src/embodied_ai/rl`: optional residual policy and reward components.
@@ -39,6 +40,31 @@ This boundary prevents Isaac, VLA, and ROS dependencies from contaminating each 
   LeRobot into the same interpreter.
 - Standard ROS messages are preferred for the MVP. Custom interfaces require explicit
   Python 3.10 and Python 3.11 build validation.
+
+## Demonstration generation boundary
+
+Stage 6 step 6 keeps task semantics, language, control, and storage as separate concerns:
+
+```text
+task definition + instruction selection
+  -> Isaac-side expert
+  -> canonical ActionSchema action
+  -> Isaac Lab step
+  -> one immutable episode per environment
+  -> later LeRobot conversion in the VLA environment
+```
+
+- `task` is a stable machine-readable task identifier whose reset and success semantics are
+  owned by the task definition.
+- `instruction` is the exact natural-language command attached to the episode. Multiple
+  instructions may describe one task without duplicating the task implementation.
+- `expert` describes the source of the actions and its revision. State machines, learned RL
+  policies, and teleoperation must implement the same Isaac-side action-producing interface.
+- Experts may read privileged simulator state, but they emit only the public normalized action
+  contract. Expert-only state is not silently added to the eventual VLA policy input.
+- The collector owns rollout lifecycle and recording; an expert does not write files. With
+  vectorized environments, the collector maintains one recorder and one terminal outcome per
+  environment rather than storing an environment batch as one episode.
 
 ## Safety and scope
 

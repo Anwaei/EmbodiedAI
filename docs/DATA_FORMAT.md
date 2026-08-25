@@ -45,6 +45,8 @@ semantics and timestamps.
 
 - schema version and episode identifier;
 - task, robot, scene, and random seed;
+- for expert demonstrations, the exact instruction, its stable variant identifier and
+  language, plus structured expert kind/identifier/revision provenance;
 - observation keys, kinds, shapes, dtypes, axes, components, units, and frames;
 - action representation, dimension, units, and control frequency;
 - simulation time base, nanosecond timestamp range, step count, and terminal outcome;
@@ -54,6 +56,37 @@ semantics and timestamps.
 There is no separate `metadata.json`; keeping one manifest avoids duplicated sources of
 truth. NumPy remains an Isaac-side recorder dependency and is not imported by the contracts
 package.
+
+## Planned expert episode fields
+
+Stage 6 step 6 will add the following additive `embodied-ai.episode/v1` manifest fields. The
+example is a design target and is not implemented yet:
+
+```json
+{
+  "task": "franka-pick-place",
+  "instruction": "Pick up the cube and place it in the goal.",
+  "instruction_id": "pick-place-cube-goal-en-001",
+  "instruction_language": "en",
+  "expert": {
+    "kind": "state_machine",
+    "identifier": "franka-pick-place-state-machine",
+    "revision": "v1",
+    "configuration_revision": "<lowercase-sha256>"
+  }
+}
+```
+
+`task` remains the machine-readable task definition. `instruction` is episode-invariant
+language and may vary across episodes with the same task. The VLA-side LeRobot converter will
+map the exact instruction text to LeRobot's task/instruction representation and retain the
+stable task and expert provenance in conversion metadata. Expert provenance is never a model
+input.
+
+Raw collection may retain successful, failed, and truncated expert attempts, but only
+successful episodes are eligible for the initial imitation-learning training split by
+default. Dataset selection policy belongs to the later converter and must not mutate the raw
+immutable episode directories.
 
 ## Invariants
 
@@ -69,3 +102,5 @@ package.
 - Conversion to LeRobot format is a validated, separate step in the VLA environment.
 - Checkpoints are accompanied by policy metadata that names the compatible schema and
   normalization statistics.
+- Every training demonstration has one task, one exact instruction, and one expert provenance
+  record for the complete episode.
