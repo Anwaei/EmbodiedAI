@@ -9,6 +9,9 @@ from embodied_ai.contracts.tasks.franka_pick_place import (
     CAMERA_WIDTH,
     CONTROL_HZ,
     CUBE_RESET_POSITION_ENV_M,
+    DEFAULT_INSTRUCTION,
+    DEFAULT_INSTRUCTION_ID,
+    DEFAULT_INSTRUCTION_LANGUAGE,
     FAILURE_MINIMUM_Z_ENV_M,
     FRANKA_PICK_PLACE_ACTION_SCHEMA,
     FRANKA_PICK_PLACE_OBSERVATION_SCHEMA,
@@ -16,6 +19,8 @@ from embodied_ai.contracts.tasks.franka_pick_place import (
     IK_ROTATION_SCALE_RAD,
     IK_TRANSLATION_SCALE_M,
     SUCCESS_POSITION_TOLERANCE_M,
+    SUCCESS_GRIPPER_OPEN_POSITION_M,
+    TASK_NAME,
 )
 
 
@@ -77,6 +82,13 @@ class FrankaPickPlaceContractTest(unittest.TestCase):
         self.assertGreater(squared_distance**0.5, SUCCESS_POSITION_TOLERANCE_M)
         self.assertGreater(CUBE_RESET_POSITION_ENV_M[2], FAILURE_MINIMUM_Z_ENV_M)
         self.assertGreater(GOAL_POSITION_ENV_M[2], FAILURE_MINIMUM_Z_ENV_M)
+        self.assertGreater(SUCCESS_GRIPPER_OPEN_POSITION_M, 0.0)
+
+    def test_default_task_and_instruction_are_stable_contract_values(self) -> None:
+        self.assertEqual(TASK_NAME, "franka-pick-place")
+        self.assertEqual(DEFAULT_INSTRUCTION, "Pick up the cube and place it in the goal.")
+        self.assertEqual(DEFAULT_INSTRUCTION_ID, "pick-place-cube-goal-en-001")
+        self.assertEqual(DEFAULT_INSTRUCTION_LANGUAGE, "en")
 
 
 if __name__ == "__main__":

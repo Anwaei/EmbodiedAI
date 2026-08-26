@@ -12,6 +12,8 @@ from embodied_ai.contracts import (
     DataType,
     EpisodeOutcome,
     EpisodeProvenance,
+    ExpertKind,
+    ExpertMetadata,
     ObservationComponent,
     ObservationField,
     ObservationKind,
@@ -66,6 +68,12 @@ class NpyEpisodeRecorderTest(unittest.TestCase):
             configuration_revision="test-configuration",
             environment_lock_sha256="a" * 64,
         )
+        self.expert = ExpertMetadata(
+            kind=ExpertKind.STATE_MACHINE,
+            identifier="test-state-machine",
+            revision="v1",
+            configuration_revision="b" * 64,
+        )
 
     def _make_recorder(self, output_root: Path):
         return self.recorder_type(
@@ -78,6 +86,10 @@ class NpyEpisodeRecorderTest(unittest.TestCase):
             observation_schema=self.observation_schema,
             action_schema=self.action_schema,
             provenance=self.provenance,
+            instruction="Move the test object.",
+            instruction_id="move-test-object-en-001",
+            instruction_language="en",
+            expert=self.expert,
         )
 
     def _observation(self, value: float):
@@ -113,6 +125,8 @@ class NpyEpisodeRecorderTest(unittest.TestCase):
             self.assertEqual(validated.step_count, 2)
             self.assertEqual(validated.start_time_ns, 0)
             self.assertEqual(validated.end_time_ns, 50_000_000)
+            self.assertEqual(validated.instruction, "Move the test object.")
+            self.assertEqual(validated.expert, self.expert)
             self.assertTrue((recorded.directory / "manifest.json").is_file())
             self.assertEqual(list(output_root.glob(".*.partial-*")), [])
             with self.assertRaisesRegex(RuntimeError, "finalized"):

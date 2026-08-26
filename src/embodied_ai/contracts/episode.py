@@ -39,6 +39,14 @@ class TimeBase(StrEnum):
     SIMULATION = "simulation"
 
 
+class ExpertKind(StrEnum):
+    """Supported sources for demonstration actions."""
+
+    STATE_MACHINE = "state_machine"
+    RL_POLICY = "rl_policy"
+    TELEOPERATION = "teleoperation"
+
+
 @dataclass(frozen=True, slots=True)
 class PayloadFile:
     """Integrity metadata for one immutable episode payload."""
@@ -112,6 +120,45 @@ class EpisodeProvenance:
 
 
 @dataclass(frozen=True, slots=True)
+class ExpertMetadata:
+    """Portable identity and revision of the action-producing expert."""
+
+    kind: ExpertKind
+    identifier: str
+    revision: str
+    configuration_revision: str
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.kind, ExpertKind):
+            raise ValueError("expert kind must be an ExpertKind")
+        require_identifier(self.identifier, "expert identifier")
+        require_non_empty(self.revision, "expert revision")
+        require_sha256(self.configuration_revision, "expert configuration_revision")
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "kind": self.kind.value,
+            "identifier": self.identifier,
+            "revision": self.revision,
+            "configuration_revision": self.configuration_revision,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> ExpertMetadata:
+        source = require_mapping(data, "expert metadata")
+        try:
+            kind = ExpertKind(source.get("kind"))
+        except (TypeError, ValueError) as error:
+            raise ValueError("unsupported expert kind") from error
+        return cls(
+            kind=kind,
+            identifier=source.get("identifier"),
+            revision=source.get("revision"),
+            configuration_revision=source.get("configuration_revision"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class EpisodeMetadata:
     """Self-describing manifest for one finalized immutable episode."""
 
@@ -129,6 +176,10 @@ class EpisodeMetadata:
     termination_reason: str | None
     payloads: tuple[PayloadFile, ...]
     provenance: EpisodeProvenance
+    instruction: str | None = None
+    instruction_id: str | None = None
+    instruction_language: str | None = None
+    expert: ExpertMetadata | None = None
     time_base: TimeBase = TimeBase.SIMULATION
     timestamp_unit: str = "ns"
     schema_version: str = EPISODE_SCHEMA_VERSION
@@ -168,6 +219,23 @@ class EpisodeMetadata:
             raise ValueError("episode payload paths must be unique")
         if not isinstance(self.provenance, EpisodeProvenance):
             raise ValueError("provenance must be EpisodeProvenance")
+        language_fields = (
+            self.instruction,
+            self.instruction_id,
+            self.instruction_language,
+            self.expert,
+        )
+        if any(value is not None for value in language_fields):
+            if not all(value is not None for value in language_fields):
+                raise ValueError(
+                    "instruction, instruction_id, instruction_language, and expert "
+                    "must be provided together"
+                )
+            require_non_empty(self.instruction, "instruction")
+            require_identifier(self.instruction_id, "instruction_id")
+            require_identifier(self.instruction_language, "instruction_language")
+            if not isinstance(self.expert, ExpertMetadata):
+                raise ValueError("expert must be ExpertMetadata")
         if self.time_base is not TimeBase.SIMULATION:
             raise ValueError("Stage 6 episodes must use the simulation time base")
         if self.timestamp_unit != "ns":
@@ -194,6 +262,17 @@ class EpisodeMetadata:
         }
         if self.termination_reason is not None:
             result["termination_reason"] = self.termination_reason
+        if self.expert is not None:
+            # Expert fields are emitted as one atomic group so partial language metadata
+            # can never masquerade as a training demonstration.
+            result.update(
+                {
+                    "instruction": self.instruction,
+                    "instruction_id": self.instruction_id,
+                    "instruction_language": self.instruction_language,
+                    "expert": self.expert.to_dict(),
+                }
+            )
         return result
 
     @classmethod
@@ -230,6 +309,16 @@ class EpisodeMetadata:
             ),
             provenance=EpisodeProvenance.from_dict(
                 require_mapping(source.get("provenance"), "episode provenance")
+            ),
+            instruction=source.get("instruction"),
+            instruction_id=source.get("instruction_id"),
+            instruction_language=source.get("instruction_language"),
+            expert=(
+                ExpertMetadata.from_dict(
+                    require_mapping(source.get("expert"), "expert metadata")
+                )
+                if source.get("expert") is not None
+                else None
             ),
             time_base=time_base,
             timestamp_unit=source.get("timestamp_unit"),

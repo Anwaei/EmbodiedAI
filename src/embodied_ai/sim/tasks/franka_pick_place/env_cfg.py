@@ -15,7 +15,8 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
-from isaaclab.sensors import TiledCameraCfg
+from isaaclab.sensors import FrameTransformerCfg, TiledCameraCfg
+from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.utils import configclass
 from isaaclab_assets.robots.franka import FRANKA_PANDA_HIGH_PD_CFG
 
@@ -136,6 +137,19 @@ class FrankaPickPlaceSceneCfg(InteractiveSceneCfg):
         ),
     )
 
+    # This expert-only sensor exposes the same tool-center frame controlled by the IK action.
+    # It is intentionally not part of the public observation contract.
+    ee_frame = FrameTransformerCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/panda_link0",
+        target_frames=[
+            FrameTransformerCfg.FrameCfg(
+                prim_path="{ENV_REGEX_NS}/Robot/panda_hand",
+                name="tool_center",
+                offset=OffsetCfg(pos=(0.0, 0.0, 0.107)),
+            )
+        ],
+    )
+
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
         spawn=sim_utils.DomeLightCfg(color=(0.75, 0.75, 0.75), intensity=2500.0),
@@ -242,7 +256,7 @@ class TerminationsCfg:
 
 @configclass
 class FrankaPickPlaceEnvCfg(ManagerBasedRLEnvCfg):
-    """Deterministic task baseline; no expert or learned policy."""
+    """Deterministic task baseline with an external expert-compatible interface."""
 
     scene: FrankaPickPlaceSceneCfg = FrankaPickPlaceSceneCfg(
         num_envs=1,

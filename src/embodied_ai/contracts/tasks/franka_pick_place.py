@@ -15,6 +15,13 @@ CONTROL_HZ = 20.0
 CAMERA_HEIGHT = 224
 CAMERA_WIDTH = 224
 
+TASK_NAME = "franka-pick-place"
+ROBOT_NAME = "franka-panda"
+SCENE_NAME = "table-cube-goal-v1"
+DEFAULT_INSTRUCTION = "Pick up the cube and place it in the goal."
+DEFAULT_INSTRUCTION_ID = "pick-place-cube-goal-en-001"
+DEFAULT_INSTRUCTION_LANGUAGE = "en"
+
 # Normalized action values are scaled by the Isaac action adapter before IK.
 IK_TRANSLATION_SCALE_M = 0.05
 IK_ROTATION_SCALE_RAD = 0.15
@@ -27,6 +34,7 @@ GOAL_POSITION_ENV_M = (0.65, -0.20, 0.03)
 GOAL_MARKER_SIZE_M = (0.11, 0.11, 0.004)
 SUCCESS_POSITION_TOLERANCE_M = 0.05
 SUCCESS_LINEAR_SPEED_TOLERANCE_M_S = 0.10
+SUCCESS_GRIPPER_OPEN_POSITION_M = 0.03
 FAILURE_X_BOUNDS_ENV_M = (0.10, 1.00)
 FAILURE_Y_BOUNDS_ENV_M = (-0.50, 0.50)
 FAILURE_MINIMUM_Z_ENV_M = -0.05

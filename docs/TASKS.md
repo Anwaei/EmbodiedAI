@@ -4,8 +4,9 @@
 
 Stage 6 step 2 introduces the Gym task `EmbodiedAI-Franka-PickPlace-RGB-v0`.
 It is a minimal `ManagerBasedRLEnv` configuration for validating the scene, deterministic
-reset/evaluation behavior, and the shared observation/action boundary. It is not yet an
-expert demonstrator or a training task.
+reset/evaluation behavior, and the shared observation/action boundary. The step 6 expert is a
+separate controller and collector layered on this task; the task itself is not a training
+environment.
 
 ### Scene
 
@@ -76,8 +77,10 @@ from the previous rollout from leaking across episodes. The cube always begins a
 `(0.65, -0.20, 0.03)` metres.
 
 `evaluate_pick_place()` returns vectorized cube position, goal position, position error,
-linear speed, success, and failure values. Success requires centre distance at most 5 cm and
-linear speed at most 0.10 m/s. Failure means the cube centre left the bounded workspace
+linear speed, gripper-open state, success, and failure values. Success requires centre
+distance at most 5 cm, linear speed at most 0.10 m/s, and both finger joints to be at least
+3 cm open. Requiring release prevents a rollout from terminating while the expert is still
+holding a cube above the goal. Failure means the cube centre left the bounded workspace
 `x=[0.10, 1.00]`, `y=[-0.50, 0.50]`, or fell below `z=-0.05` metres. Success and failure are
 mutually exclusive and are wired into Isaac Lab termination terms; the ten-second time limit
 remains a truncation. Reward remains an explicit zero placeholder because no training reward
@@ -85,43 +88,40 @@ was approved.
 
 The following remain deferred:
 
-- implementation of the reviewed Stage 6 step 6 deterministic expert and demonstration
-  collection plan below;
-- LeRobot conversion of the future expert demonstrations;
+- LeRobot conversion of the expert demonstrations;
 - learned policy inference or VLA training.
 
-## Stage 6 step 6 plan: expert demonstration generation
+## Stage 6 step 6: expert demonstration generation
 
-Status: **design only; no expert or collector implementation has been added**.
+Status: **implemented and GPU-validated on 2026-08-25**.
 
 ### Initial scope
 
-The first expert will solve the existing `franka-pick-place` task from its deterministic reset
-and emit the unchanged normalized seven-dimensional action contract. Its canonical instruction
+The first expert solves the existing `franka-pick-place` task from its deterministic reset
+and emits the unchanged normalized seven-dimensional action contract. Its canonical instruction
 is:
 
 ```text
 Pick up the cube and place it in the goal.
 ```
 
-The first delivery targets one reproducible successful episode from one environment. It does
+The implementation targets one reproducible successful episode from one environment. It does
 not add VLA inference, LeRobot imports, training, domain randomization, or a learned reward.
 The existing fixed scene, current-state evaluator, and immutable NPY recorder remain the
 authoritative task and storage boundaries.
 
-### Planned expert interface
+### Expert interface
 
-An Isaac-side expert interface will separate action generation from collection. Its logical
-operations are:
+The Isaac-side `Expert` protocol separates action generation from collection. Its operations
+are:
 
-- `reset(env, env_ids, task_context)`: initialize per-environment expert state at an episode
-  boundary;
-- `act(env, observations, task_context)`: return a batched `float32` tensor conforming exactly
+- `reset(env_ids)`: initialize per-environment expert state at an episode boundary;
+- `act(env, observations)`: return a batched `float32` tensor conforming exactly
   to `FRANKA_PICK_PLACE_ACTION_SCHEMA`;
 - `metadata`: return the dependency-light expert kind, identifier, revision, and configuration
   revision written to the episode manifest.
 
-`task_context` will identify the task and selected instruction and expose the task parameters
+`task_context` identifies the task and selected instruction and exposes the task parameters
 needed by the expert. The state-machine expert may read privileged simulator state such as the
 end-effector pose, cube pose, goal pose, and gripper state. Those values guide demonstration
 generation but do not automatically become VLA policy observations. The expert must use normal
@@ -131,10 +131,10 @@ The initial interface is batched even though the first collector uses one enviro
 environment owns an independent state-machine phase, phase timer, and terminal status. This
 preserves a later path to vectorized collection without changing the public action contract.
 
-### Planned deterministic state machine
+### Deterministic state machine
 
-The initial controller will use a fixed downward grasp orientation, proportional clipped
-task-space deltas, explicit tolerances, and a maximum duration for every phase. The planned
+The controller uses a fixed downward grasp orientation, proportional clipped task-space
+deltas, explicit tolerances, and a maximum duration for every phase. The implemented
 phases are:
 
 1. `move_above_cube`: open the gripper and move to a pre-grasp position above the cube.
@@ -148,15 +148,15 @@ phases are:
    final success decision.
 9. `done` or `failed`: stop producing rollout actions after success or a phase timeout/failure.
 
-Transition thresholds, gains, hover heights, settle durations, and per-phase limits will be
-committed configuration rather than scattered constants. Actions will be clipped to `[-1, 1]`;
+Transition thresholds, gains, hover heights, settle durations, and per-phase limits are in
+committed TOML configuration rather than scattered constants. Actions are clipped to `[-1, 1]`;
 the existing Isaac action adapter remains solely responsible for applying the 0.05 m translation
 and 0.15 rad rotation scales. State-machine phase completion is internal control state and must
 not replace the task's public success/failure evaluation.
 
-### Planned collection lifecycle
+### Collection lifecycle
 
-The collector, rather than the expert, will own the environment and recorder lifecycle:
+The collector, rather than the expert, owns the environment and recorder lifecycle:
 
 ```text
 select task + instruction + expert
@@ -168,12 +168,12 @@ select task + instruction + expert
   -> publish one immutable episode directory
 ```
 
-Every collected training demonstration will record the stable task ID, exact instruction text,
+Every collected training demonstration records the stable task ID, exact instruction text,
 instruction variant ID/language, and expert provenance described in `CONTRACTS.md`. The raw
 collection root may retain failed or truncated attempts for diagnosis, but the later VLA
 conversion will select successful episodes by default and will not rewrite raw episodes.
 
-The first collector will preserve the currently accepted lifecycle of one explicit reset per
+The first collector preserves the currently accepted lifecycle of one explicit reset per
 environment instance. A repeated-reset regression must be resolved before collecting multiple
 sequential episodes in one process. Until then, repeated deterministic collection may use one
 fresh process/environment lifecycle per episode. Future vectorized collection will maintain one
@@ -199,9 +199,9 @@ The three extension axes are deliberately independent:
 This means language paraphrases do not duplicate task logic, new tasks do not require recorder
 changes, and new expert sources do not alter the episode observation/action representation.
 
-### Planned repository additions
+### Repository additions
 
-The implementation review is expected to introduce modules with responsibilities equivalent to:
+The implementation introduces these modules:
 
 ```text
 src/embodied_ai/sim/experts/
@@ -215,9 +215,44 @@ scripts/sim/
 └── collect_franka_pick_place_expert.py
 ```
 
-Exact filenames may be adjusted during implementation review, but dependency ownership may not:
-all simulator control and collection code remains in the Isaac environment, while LeRobot
+All simulator control and collection code remains in the Isaac environment, while LeRobot
 conversion remains a later VLA-environment step.
+
+### Expert episode check
+
+Run one deterministic expert rollout from an explicitly configured Isaac shell:
+
+```bash
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src "$EMBODIEDAI_ENVS/isaac/bin/python" \
+  scripts/sim/collect_franka_pick_place_expert.py \
+  --headless --enable_cameras --device cuda:0 --steps 300 --seed 0 \
+  --output_root "$EMBODIEDAI_DATASETS/stage6-expert" \
+  --episode_id episode-stage6-expert-000001 \
+  --video_path \
+  "$EMBODIEDAI_ARTIFACTS/stage6/expert-videos/episode-stage6-expert-000001.mp4"
+```
+
+The script creates one environment, performs one explicit reset, collects synchronized
+pre-action observation/action pairs, publishes one immutable episode, and reopens it through
+the NPY validator. A non-success outcome is retained for diagnosis but makes the command fail.
+The command accepts alternate instruction text, instruction ID/language, task ID, expert TOML,
+seed, and episode ID without changing the recorder.
+`--video_path` is optional and must resolve below `EMBODIEDAI_ARTIFACTS`. After a successful
+episode passes NPY validation, the script derives an H.264 MP4 from the exact recorded RGB
+frames. The MP4 stays outside the immutable episode and may be regenerated independently.
+
+On 2026-08-25 the accepted RTX 5090 validation succeeded in 108 control steps. Its phase
+counts were 28 move-above-cube, 13 descend-to-grasp, 10 close-gripper, 17 lift-cube,
+23 move-above-goal, 15 descend-to-place, and 2 open-gripper actions. The validated episode is
+`/root/autodl-tmp/EmbodiedAI/datasets/stage6-expert-validation-20260825/episode-stage6-expert-000002`.
+It contains action shape `(108, 7)`, camera shape `(108, 3, 224, 224)`, the canonical
+instruction, and state-machine/configuration provenance. No VLA training was run.
+
+On 2026-08-26 the integrated `--video_path` path also passed with a fresh 108-step expert
+episode. It produced a 224 x 224 H.264/yuv420p MP4 at 20 FPS with 108 readable frames and a
+5.4-second duration under `EMBODIEDAI_ARTIFACTS`; neither the episode nor artifact root retained
+a partial directory/file.
 
 ### Bounded skeleton check
 

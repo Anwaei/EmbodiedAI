@@ -1,0 +1,30 @@
+schema_version = "embodied-ai.franka-pick-place-state-machine/v1"
+identifier = "franka-pick-place-state-machine"
+revision = "v1"
+
+# Cartesian deltas are normalized before the Isaac action adapter applies physical scales.
+position_gain = 1.0
+rotation_gain = 1.0
+position_tolerance_m = 0.012
+orientation_tolerance_rad = 0.12
+
+pre_grasp_height_m = 0.12
+grasp_height_offset_m = 0.0
+lift_height_m = 0.18
+cube_lift_threshold_m = 0.09
+transfer_height_m = 0.18
+place_height_offset_m = 0.0
+retreat_x_offset_m = -0.10
+
+close_settle_steps = 10
+release_settle_steps = 12
+
+[phase_timeout_steps]
+move_above_cube = 80
+descend_to_grasp = 60
+close_gripper = 30
+lift_cube = 60
+move_above_goal = 80
+descend_to_place = 60
+open_gripper = 40
+retreat = 60

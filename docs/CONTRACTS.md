@@ -2,8 +2,8 @@
 
 This document records the shared contract decisions introduced in Stage 6 step 1, the
 task-specific Franka contract instance added in step 2, the Stage 6 steps 3-5 simulator
-adapter and immutable episode publication decisions, and the planned additive metadata for
-step 6 expert demonstrations.
+adapter and immutable episode publication decisions, and the additive metadata implemented
+for step 6 expert demonstrations.
 
 ## Boundary and dependency policy
 
@@ -70,8 +70,8 @@ the contract.
 The Franka task-specific v1 instance uses a normalized seven-dimensional
 `end_effector_delta_pose` boundary: six relative IK values in the robot base frame followed
 by one binary gripper value. Translation and rotation scales are task configuration rather
-than hidden contract units and are recorded in `TASKS.md`. The later deterministic expert
-must emit this same interface.
+than hidden contract units and are recorded in `TASKS.md`. The deterministic expert emits
+this same interface.
 
 ## Episode metadata schema
 
@@ -103,9 +103,9 @@ issued at the same control boundary. The episode produced by the bounded zero-ac
 classified as `truncated` with reason `smoke-test-step-limit`; it is structural test data, not
 a successful demonstration.
 
-## Planned expert-demonstration metadata
+## Expert-demonstration metadata
 
-Stage 6 step 6 will extend `EpisodeMetadata` additively while retaining
+Stage 6 step 6 extends `EpisodeMetadata` additively while retaining
 `embodied-ai.episode/v1`. Existing structural episodes remain readable, but an episode offered
 as an expert demonstration must provide all of the following:
 
@@ -133,18 +133,17 @@ observation. `task`, instruction wording, and expert identity are orthogonal: ch
 paraphrase does not create a new task, and changing the action source does not change task
 semantics.
 
-The step 6 implementation must validate non-empty normalized strings, supported expert kinds,
-and identifier/revision syntax in the dependency-light contracts layer. This is an additive
-v1 change because existing v1 readers already ignore unknown fields; any future change that
-alters the meaning of `task` or the action/observation boundary requires a new major schema.
+The contracts layer validates non-empty normalized strings and supported expert kinds. The
+four demonstration fields are optional as a group for backward compatibility, but supplying
+only part of the group is rejected. This is an additive v1 change because existing v1 readers
+already ignore unknown fields; any future change that alters the meaning of `task` or the
+action/observation boundary requires a new major schema.
 
 ## Deferred decisions
 
-The following remain deferred after steps 1-5:
+The following remain deferred after step 6:
 
 - production camera codec and finalized camera calibration metadata;
-- implementation of the reviewed expert metadata, state-machine controller, and successful
-  demonstration collection plan;
 - streaming/chunked recording for long episodes;
 - LeRobot feature mapping and normalization statistics;
 - VLA training and learned-policy inference.

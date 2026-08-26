@@ -14,6 +14,7 @@ from embodied_ai.contracts.tasks.franka_pick_place import (
     FAILURE_X_BOUNDS_ENV_M,
     FAILURE_Y_BOUNDS_ENV_M,
     GOAL_POSITION_ENV_M,
+    SUCCESS_GRIPPER_OPEN_POSITION_M,
     SUCCESS_LINEAR_SPEED_TOLERANCE_M_S,
     SUCCESS_POSITION_TOLERANCE_M,
 )
@@ -27,6 +28,7 @@ class PickPlaceEvaluation:
     goal_position_env_m: torch.Tensor
     position_error_m: torch.Tensor
     linear_speed_m_s: torch.Tensor
+    gripper_open: torch.Tensor
     success: torch.Tensor
     failure: torch.Tensor
 
@@ -44,6 +46,7 @@ def cube_position_env(
 def evaluate_cube_state(
     cube_position_env_m: torch.Tensor,
     cube_linear_velocity_w_m_s: torch.Tensor,
+    gripper_open: torch.Tensor | None = None,
 ) -> PickPlaceEvaluation:
     """Evaluate already adapted cube state without reading simulator handles."""
 
@@ -51,14 +54,22 @@ def evaluate_cube_state(
         raise ValueError("cube positions must have shape (num_envs, 3)")
     if cube_linear_velocity_w_m_s.shape != cube_position_env_m.shape:
         raise ValueError("cube linear velocities must match cube position shape")
+    if gripper_open is None:
+        gripper_open = torch.ones(
+            cube_position_env_m.shape[0], dtype=torch.bool, device=cube_position_env_m.device
+        )
+    if gripper_open.shape != (cube_position_env_m.shape[0],):
+        raise ValueError("gripper_open must have shape (num_envs,)")
 
     goal = cube_position_env_m.new_tensor(GOAL_POSITION_ENV_M).expand_as(
         cube_position_env_m
     )
     position_error = torch.linalg.vector_norm(cube_position_env_m - goal, dim=-1)
     linear_speed = torch.linalg.vector_norm(cube_linear_velocity_w_m_s, dim=-1)
-    success = (position_error <= SUCCESS_POSITION_TOLERANCE_M) & (
-        linear_speed <= SUCCESS_LINEAR_SPEED_TOLERANCE_M_S
+    success = (
+        (position_error <= SUCCESS_POSITION_TOLERANCE_M)
+        & (linear_speed <= SUCCESS_LINEAR_SPEED_TOLERANCE_M_S)
+        & gripper_open
     )
 
     x = cube_position_env_m[:, 0]
@@ -78,6 +89,7 @@ def evaluate_cube_state(
         goal_position_env_m=goal,
         position_error_m=position_error,
         linear_speed_m_s=linear_speed,
+        gripper_open=gripper_open,
         success=success,
         failure=failure,
     )
@@ -90,9 +102,16 @@ def evaluate_pick_place(
     """Read the current scene and return the public vectorized task evaluation."""
 
     cube = env.scene[asset_cfg.name]
+    robot = env.scene["robot"]
+    finger_joint_ids, _ = robot.find_joints("panda_finger_joint.*")
+    gripper_open = torch.all(
+        robot.data.joint_pos[:, finger_joint_ids] >= SUCCESS_GRIPPER_OPEN_POSITION_M,
+        dim=-1,
+    )
     return evaluate_cube_state(
         cube_position_env(env, asset_cfg),
         cube.data.root_lin_vel_w,
+        gripper_open,
     )
 
 

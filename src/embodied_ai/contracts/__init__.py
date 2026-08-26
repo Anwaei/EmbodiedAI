@@ -12,6 +12,8 @@ from .episode import (
     EpisodeMetadata,
     EpisodeOutcome,
     EpisodeProvenance,
+    ExpertKind,
+    ExpertMetadata,
     PayloadFile,
     TimeBase,
 )
@@ -36,6 +38,8 @@ __all__ = [
     "EpisodeMetadata",
     "EpisodeOutcome",
     "EpisodeProvenance",
+    "ExpertKind",
+    "ExpertMetadata",
     "ObservationComponent",
     "ObservationField",
     "ObservationKind",

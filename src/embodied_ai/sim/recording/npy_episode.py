@@ -19,6 +19,7 @@ from embodied_ai.contracts import (
     EpisodeMetadata,
     EpisodeOutcome,
     EpisodeProvenance,
+    ExpertMetadata,
     ObservationSchema,
     PayloadFile,
 )
@@ -89,6 +90,10 @@ class NpyEpisodeRecorder:
         observation_schema: ObservationSchema,
         action_schema: ActionSchema,
         provenance: EpisodeProvenance,
+        instruction: str | None = None,
+        instruction_id: str | None = None,
+        instruction_language: str | None = None,
+        expert: ExpertMetadata | None = None,
     ) -> None:
         if not _EPISODE_ID_RE.fullmatch(episode_id):
             raise ValueError("episode_id is not a contract-compatible identifier")
@@ -101,6 +106,10 @@ class NpyEpisodeRecorder:
         self.observation_schema = observation_schema
         self.action_schema = action_schema
         self.provenance = provenance
+        self.instruction = instruction
+        self.instruction_id = instruction_id
+        self.instruction_language = instruction_language
+        self.expert = expert
         self.final_directory = self.output_root / episode_id
         if self.final_directory.exists():
             raise FileExistsError(
@@ -256,6 +265,10 @@ class NpyEpisodeRecorder:
                 termination_reason=termination_reason,
                 payloads=tuple(payloads),
                 provenance=self.provenance,
+                instruction=self.instruction,
+                instruction_id=self.instruction_id,
+                instruction_language=self.instruction_language,
+                expert=self.expert,
             )
             _write_manifest(partial_directory / "manifest.json", metadata)
             self.final_directory.parent.mkdir(parents=True, exist_ok=True)

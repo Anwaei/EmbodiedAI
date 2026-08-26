@@ -14,6 +14,8 @@ from embodied_ai.contracts import (
     EpisodeMetadata,
     EpisodeOutcome,
     EpisodeProvenance,
+    ExpertKind,
+    ExpertMetadata,
     ObservationComponent,
     ObservationField,
     ObservationKind,
@@ -23,6 +25,15 @@ from embodied_ai.contracts import (
 
 _DIGEST_A = "a" * 64
 _DIGEST_B = "b" * 64
+
+
+def make_expert_metadata() -> ExpertMetadata:
+    return ExpertMetadata(
+        kind=ExpertKind.STATE_MACHINE,
+        identifier="franka-pick-place-state-machine",
+        revision="v1",
+        configuration_revision="d" * 64,
+    )
 
 
 def make_metadata(outcome: EpisodeOutcome = EpisodeOutcome.SUCCESS) -> EpisodeMetadata:
@@ -87,6 +98,34 @@ class EpisodeContractTest(unittest.TestCase):
         encoded["future_optional_field"] = {"value": 1}
 
         self.assertEqual(EpisodeMetadata.from_dict(encoded), make_metadata())
+
+    def test_expert_demonstration_metadata_round_trip(self) -> None:
+        metadata = replace(
+            make_metadata(),
+            instruction="Pick up the cube and place it in the goal.",
+            instruction_id="pick-place-cube-goal-en-001",
+            instruction_language="en",
+            expert=make_expert_metadata(),
+        )
+
+        encoded = json.loads(json.dumps(metadata.to_dict()))
+
+        self.assertEqual(EpisodeMetadata.from_dict(encoded), metadata)
+        self.assertEqual(encoded["expert"]["kind"], "state_machine")
+
+    def test_expert_demonstration_fields_are_atomic(self) -> None:
+        with self.assertRaisesRegex(ValueError, "provided together"):
+            replace(make_metadata(), instruction="Incomplete demonstration")
+
+        with self.assertRaisesRegex(ValueError, "unsupported expert kind"):
+            ExpertMetadata.from_dict(
+                {
+                    "kind": "unknown",
+                    "identifier": "unknown-expert",
+                    "revision": "v1",
+                    "configuration_revision": "d" * 64,
+                }
+            )
 
     def test_failure_and_truncation_require_a_reason(self) -> None:
         for outcome in (EpisodeOutcome.FAILURE, EpisodeOutcome.TRUNCATED):
