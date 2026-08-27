@@ -84,6 +84,26 @@ task definition + instruction selection
   vectorized environments, the collector maintains one recorder and one terminal outcome per
   environment rather than storing an environment batch as one episode.
 
+## Offline dataset conversion boundary
+
+Stage 7 keeps mapping decisions separate from LeRobot I/O:
+
+```text
+immutable Contract episode
+  -> NPY/checksum/schema eligibility validation
+  -> versioned Contract-to-LeRobot mapping
+  -> serial mmap-backed LeRobot writer
+  -> finalize + reopen in a private directory
+  -> atomic dataset publication + conversion provenance
+```
+
+The mapping module depends only on the shared contracts. The converter runs only in the VLA
+environment and may import NumPy and LeRobot; simulator code continues to reject those imports.
+The initial policy sees joint position and front RGB. Joint velocity is an explicit future mapping
+decision, while cube position is privileged simulator state and is never silently exposed to the
+VLA. Original episode directories remain immutable and traceable through manifest hashes in the
+conversion sidecar.
+
 ## Safety and scope
 
 - The first task is Franka pick-and-place.

@@ -11,7 +11,7 @@
 | 4 | Install and validate Isaac environment | Completed 2026-08-20; see `ENVIRONMENT.md` |
 | 5 | Install and validate VLA environment | Completed 2026-08-21; see `ENVIRONMENT.md` |
 | 6 | Isaac Demonstration Pipeline | In progress; single-episode pipeline completed 2026-08-26, multi-episode generation pending |
-| 7 | LeRobot + VLA Training Pipeline | Not approved |
+| 7 | LeRobot + VLA Training Pipeline | In progress; step 1 and bounded step 2 implementation completed 2026-08-27 |
 | 8 | Closed-loop Policy Evaluation | Not approved |
 | 9 | RL Policy Refinement | Not approved |
 | 10 | ROS 2 deployment boundary | Not approved |
@@ -59,12 +59,21 @@ without LeRobot or VLA dependencies in the Isaac runtime.
 
 ## Stage 7 — LeRobot + VLA Training Pipeline
 
-All steps are pending and require explicit review. Stage 5 proved that the locked environment,
-synthetic LeRobot round trip, offline base checkpoint, and bounded PEFT mechanics work; those
-environment smokes do not replace this project-data pipeline.
+Stage 5 proved that the locked environment, synthetic LeRobot round trip, offline base checkpoint,
+and bounded PEFT mechanics work; those environment smokes do not replace this project-data
+pipeline.
 
-1. Define and implement the versioned Contract → LeRobot feature/task mapping.
+1. Define and implement the versioned Contract → LeRobot feature/task mapping. **Completed.** The
+   `franka-pick-place-smolvla-v1` profile maps joint positions, front RGB, normalized 7D actions,
+   and exact episode instructions while explicitly excluding joint velocity and privileged cube
+   position from the initial policy input.
 2. Build a `LeRobotDataset` from validated Stage 6 episodes without mutating the raw source data.
+   **Partially completed.** The converter now validates source manifests/payloads, preserves
+   source/expert provenance in a conversion sidecar, keeps one-to-one episode boundaries, and
+   atomically publishes a finalized/reopened local dataset. A three-frame image-backed CPU round
+   trip passed in no-GPU mode. The real 108-frame smoke was terminated by the current 2 GiB memory
+   limit before publication; its private partial directory was removed. Full real/multi-episode
+   conversion therefore remains pending a higher-memory allocation.
 3. Validate episode counts, frames, timestamps, image/action shapes, task/instruction mapping,
    normalization inputs, and deterministic reload behavior.
 4. Implement and validate SmolVLA preprocessing against the converted dataset.

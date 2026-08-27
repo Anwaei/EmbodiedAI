@@ -88,6 +88,47 @@ successful episodes are eligible for the initial imitation-learning training spl
 default. Dataset selection policy belongs to the later converter and must not mutate the raw
 immutable episode directories.
 
+## Stage 7 LeRobot conversion
+
+`src/embodied_ai/data/lerobot_mapping.py` owns the versioned feature/task mapping, while
+`src/embodied_ai/data/lerobot_converter.py` owns VLA-environment I/O. The first mapping profile
+uses 9D joint position as `observation.state`, front RGB as `observation.images.front`, the
+normalized 7D contract action as `action`, and the exact episode instruction as LeRobot `task`.
+Joint velocity and privileged cube position are intentionally absent from the initial policy
+input. The immutable Contract episode remains the source of truth.
+
+The converter accepts successful instruction-bearing expert episodes only. Before writing, it
+validates every source payload/checksum, exact task/schema identity, the regular 20 Hz timestamp
+grid, finite selected state/action values, and action bounds. Source arrays are memory-mapped and
+processed one frame at a time. One source directory becomes one destination episode.
+
+The destination is first written below a private sibling `.partial-*` directory. LeRobot metadata
+is finalized and reopened before a same-filesystem rename publishes the requested root. The
+converter refuses to overwrite an existing destination. It adds
+`meta/embodied_ai_conversion.json`, identified by `embodied-ai.lerobot-conversion/v1`, containing
+the mapping, source manifest hashes, exact instruction IDs/text, expert provenance, source
+timestamps, and source-to-destination episode indices. These fields are provenance, not policy
+inputs.
+
+Run the bounded image-backed form from the isolated VLA environment:
+
+```bash
+EMBODIEDAI_CPU_THREADS=1
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+MALLOC_ARENA_MAX=1 MALLOC_TRIM_THRESHOLD_=65536 PYTHONMALLOC=malloc \
+"$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/data/contract_episodes_to_lerobot.py \
+  "$EMBODIEDAI_DATASETS/<raw-collection>/<episode-id>" \
+  --output_root "$EMBODIEDAI_DATASETS/<converted-dataset>" \
+  --repo_id embodiedai/<dataset-id> --storage images
+```
+
+`--storage videos` is the intended compact dataset option, but it adds FFmpeg work and was not
+approved for the 2 GiB no-GPU smoke. On 2026-08-27 a three-frame image-backed unit round trip
+finalized and reloaded successfully. A real 108-frame attempt was killed by the allocation before
+publication; its private partial directory was removed, so no incomplete public dataset remains.
+
 ## Derived camera previews
 
 Run the standalone converter from a configured project shell:

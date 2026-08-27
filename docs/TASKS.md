@@ -88,7 +88,8 @@ was approved.
 
 The following are owned by later stages:
 
-- Stage 7 LeRobot conversion and VLA training;
+- Stage 7 full real/multi-episode LeRobot conversion and VLA training; the versioned mapping and
+  bounded converter implementation are complete;
 - Stage 8 learned-policy inference and closed-loop evaluation.
 
 ## Stage 6 step 6: expert demonstration generation

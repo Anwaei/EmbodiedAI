@@ -139,13 +139,33 @@ only part of the group is rejected. This is an additive v1 change because existi
 already ignore unknown fields; any future change that alters the meaning of `task` or the
 action/observation boundary requires a new major schema.
 
+## Stage 7 Contract to LeRobot mapping
+
+Stage 7 step 1 adds the separate mapping identifier
+`embodied-ai.lerobot-mapping/v1`. The initial profile is
+`franka-pick-place-smolvla-v1`:
+
+| Contract source | LeRobot target | Policy role |
+|---|---|---|
+| `robot.joint_position` | `observation.state` | 9D proprioceptive input |
+| `camera.front.rgb` | `observation.images.front` | 3 x 224 x 224 visual input |
+| canonical action payload | `action` | normalized 7D output target |
+| episode `instruction` | per-frame `task` | exact language input |
+| `robot.joint_velocity` | excluded | deferred from the initial proprioceptive baseline |
+| `object.cube.position` | excluded | privileged simulator state, never a VLA input |
+
+Every observation must be classified exactly once as state input, visual input, or an explicitly
+excluded field. The mapping validates the complete task, robot, scene, observation schema, and
+action schema before conversion, so future schema drift cannot be silently dropped. It remains a
+dependency-light description; only the Stage 7 converter imports NumPy and LeRobot.
+
 ## Deferred decisions
 
 The following remain deferred after step 6:
 
 - production camera codec and finalized camera calibration metadata;
 - streaming/chunked recording for long episodes;
-- Stage 7 LeRobot feature mapping and normalization statistics;
+- Stage 7 dataset normalization statistics and any later proprioceptive-state expansion;
 - Stage 7 VLA training and Stage 8 learned-policy inference.
 
 These decisions must build on the v1 contracts and may not introduce LeRobot imports into
