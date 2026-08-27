@@ -110,24 +110,27 @@ the mapping, source manifest hashes, exact instruction IDs/text, expert provenan
 timestamps, and source-to-destination episode indices. These fields are provenance, not policy
 inputs.
 
-Run the bounded image-backed form from the isolated VLA environment:
+Run the compact video-backed form from the isolated VLA environment:
 
 ```bash
-EMBODIEDAI_CPU_THREADS=1
 source scripts/bootstrap/project_env.sh
 PYTHONPATH=src HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
-MALLOC_ARENA_MAX=1 MALLOC_TRIM_THRESHOLD_=65536 PYTHONMALLOC=malloc \
 "$EMBODIEDAI_ENVS/vla/bin/python" \
   scripts/data/contract_episodes_to_lerobot.py \
   "$EMBODIEDAI_DATASETS/<raw-collection>/<episode-id>" \
   --output_root "$EMBODIEDAI_DATASETS/<converted-dataset>" \
-  --repo_id embodiedai/<dataset-id> --storage images
+  --repo_id embodiedai/<dataset-id> --storage videos
 ```
 
-`--storage videos` is the intended compact dataset option, but it adds FFmpeg work and was not
-approved for the 2 GiB no-GPU smoke. On 2026-08-27 a three-frame image-backed unit round trip
-finalized and reloaded successfully. A real 108-frame attempt was killed by the allocation before
-publication; its private partial directory was removed, so no incomplete public dataset remains.
+`--storage images` remains useful for small debugging fixtures. On 2026-08-27 a three-frame
+image-backed unit round trip finalized and reloaded successfully in no-GPU mode. The first real
+attempt could not fit the temporary 2 GiB allocation and left no published partial dataset. After
+returning to the 25-CPU/90-GiB GPU allocation, the accepted 108-frame Stage 6 expert episode was
+successfully published as
+`/root/autodl-tmp/EmbodiedAI/datasets/stage7-franka-pick-place-v1`. LeRobot 0.6.0 reopened it as
+one 20 Hz episode; the video-backed front camera is a 224 x 224 AV1 stream with 108 readable frames
+and a 5.4-second duration. The conversion sidecar retains the exact instruction, expert/source
+provenance, and source manifest SHA-256.
 
 ## Derived camera previews
 

@@ -1,6 +1,6 @@
 # Environment and Bootstrap Plan
 
-Status: **Stages 1-5 completed; Stage 6 in progress; Stage 7 steps 1 and bounded 2 in progress; Stages 8-11 not approved**
+Status: **Stages 1-5 completed; Stage 6 in progress; Stage 7 steps 1-2 completed; Stages 8-11 not approved**
 Audit date: 2026-08-17 (hardware); roadmap structure updated 2026-08-27
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
@@ -14,7 +14,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
   - LeRobot `v0.6.0` with the `smolvla` feature set, Python `3.12`, PyTorch `2.8.0+cu128`, TorchCodec `0.7.x`, NumPy `2.2.x`.
   - ROS 2 Humble on Ubuntu 22.04 using its native Python `3.10`, communicating with Isaac Sim through DDS and the Isaac Sim ROS 2 bridge.
 - The restarted container now passes the static hardware/resource preflight: one usable RTX 5090, a 25-CPU cgroup quota, 90 GiB RAM, 45 GiB shared memory, and 550 GiB on the data disk. The 30 GiB root filesystem remains intentionally code-only.
-- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 steps 1-6 established the contracts, task skeleton, deterministic reset/evaluation, immutable episode path, and instruction-bearing state-machine expert generation. Multi-episode expert generation remains the Stage 6 exit work. Stage 7 steps 1 and the no-GPU-feasible part of step 2 were later approved; Stages 8-11 remain separate and unauthorized.
+- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 steps 1-6 established the contracts, task skeleton, deterministic reset/evaluation, immutable episode path, and instruction-bearing state-machine expert generation. Multi-episode expert generation remains the Stage 6 exit work. Stage 7 steps 1-2 were later approved and completed; Stages 8-11 remain separate and unauthorized.
 - Stage 2/3 execution occurred while the leased server was in no-GPU mode; this was acceptable for lock-only work and no GPU test was attempted. The GPU-mode hardware audit above remains the acceptance baseline for the later runtime stages.
 
 ## 2. Remote-machine audit
@@ -418,13 +418,16 @@ LeRobot or VLA dependencies in the Isaac runtime.
   from the initial proprioceptive baseline, and cube position is explicitly excluded as privileged
   simulator state.
 - Build a `LeRobotDataset` from validated Stage 6 episodes without mutating the raw source data.
-  **Partially completed 2026-08-27.** The implementation validates immutable source payloads,
+  **Completed 2026-08-27.** The implementation validates immutable source payloads,
   schema identity, success/expert eligibility, regular 20 Hz timestamps, finite states/actions,
   and action bounds. It uses mmap-backed source arrays, serial frame writes, one source directory
   per LeRobot episode, a provenance sidecar, finalization/reopen checks, and atomic publication.
-  A three-frame image-backed unit round trip passed in no-GPU mode. The real 108-frame image-backed
-  smoke was killed with status 137 under the 0.5-CPU/2-GiB allocation before publication. Its only
-  4.7 MiB private partial directory was removed; no final Stage 7 dataset was produced.
+  A three-frame image-backed unit round trip passed in no-GPU mode. After returning to the
+  25-CPU/90-GiB GPU allocation, the accepted 108-frame expert episode was converted to the
+  video-backed `/root/autodl-tmp/EmbodiedAI/datasets/stage7-franka-pick-place-v1` dataset. It
+  reopened as one episode at 20 Hz; its 224 x 224 AV1 stream contains 108 readable frames over
+  5.4 seconds, and the source manifest retained SHA-256
+  `14c94f869d48d6920b085d6cf7576d2f50597ec86fc8e07810d32ae1697db5a8`.
 - Validate episode/frame counts, timestamps, image/action shapes, task/instruction mapping,
   normalization inputs, and deterministic reload behavior.
 - Implement and validate SmolVLA preprocessing for the converted project dataset.
@@ -491,9 +494,9 @@ The Stage 0 approval accepted:
 4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
 
-Next review gates: define and approve the Stage 6 multi-episode collection matrix, then rerun the
-Stage 7 real/multi-episode conversion and dataset validation in an allocation with sufficient RAM.
-SmolVLA preprocessing, inference, and training remain unapproved later Stage 7 work.
+Next review gates: define and approve the Stage 6 multi-episode collection matrix, then review
+Stage 7 step 3 dataset validation. SmolVLA preprocessing, inference, and training remain
+unapproved later Stage 7 work.
 
 ## 8. References
 
@@ -551,3 +554,9 @@ SmolVLA preprocessing, inference, and training remain unapproved later Stage 7 w
   three-frame image-backed LeRobot round trip passed. A real 108-frame attempt was terminated by
   the 2 GiB cgroup limit before final publication; the 4.7 MiB private partial directory was
   removed. No SmolVLA preprocessing, inference, training, or multi-episode conversion ran.
+- 2026-08-27: Completed the remaining Stage 7 step 2 work after reconnecting to the GPU-mode
+  25-CPU/90-GiB allocation. Mapping, converter, and dependency-boundary tests passed. Converted the
+  accepted 108-frame expert episode into the finalized video-backed
+  `stage7-franka-pick-place-v1` dataset, reopened it through LeRobot 0.6.0, verified its AV1 stream,
+  and confirmed that the source manifest hash was unchanged. No packages, locks, raw episodes,
+  SmolVLA preprocessing, inference, or training were modified or run.
