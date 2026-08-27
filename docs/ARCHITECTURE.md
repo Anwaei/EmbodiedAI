@@ -17,6 +17,24 @@ ROS 2 Humble (system Python 3.10)
 
 This boundary prevents Isaac, VLA, and ROS dependencies from contaminating each other.
 
+## Roadmap pipeline ownership
+
+The post-environment roadmap follows the runtime and artifact boundaries above:
+
+| Stage | Pipeline owner | Primary output |
+|---|---|---|
+| 6 | Isaac Demonstration Pipeline | validated immutable expert episodes and derived previews |
+| 7 | LeRobot + VLA Training Pipeline | validated `LeRobotDataset` plus SmolVLA base/PEFT artifacts |
+| 8 | Closed-loop Policy Evaluation | Isaac rollout metrics and baseline comparisons |
+| 9 | RL Policy Refinement | PPO/SAC and optional bounded residual-policy results |
+| 10 | ROS 2 deployment boundary | deployment messages, nodes, and safety-checked control path |
+| 11 | Reproducibility and robustness gate | clean rebuild and perturbation/robustness report |
+
+Stage 6 ends at contract-compliant raw demonstration data. Stage 7 owns Contract → LeRobot
+conversion and offline VLA training. Stage 8 owns online policy/Isaac interaction. Stage 9 is
+gated on the Stage 8 imitation baseline and may refine it without changing the public action
+contract. ROS 2 deployment and the final robustness gate remain separate Stages 10 and 11.
+
 ## Repository modules
 
 - `src/embodied_ai/contracts`: dependency-light data and policy interface schemas.

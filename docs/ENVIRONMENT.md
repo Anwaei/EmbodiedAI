@@ -1,7 +1,7 @@
 # Environment and Bootstrap Plan
 
-Status: **Stages 1-5 completed; Stage 6 steps 1-6 completed; Stages 7-8 not approved**
-Audit date: 2026-08-17 (hardware), updated 2026-08-25 for Stage 6 step 6
+Status: **Stages 1-5 completed; Stage 6 in progress with steps 1-6 completed; Stages 7-11 not approved**
+Audit date: 2026-08-17 (hardware); roadmap structure updated 2026-08-27
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
 ## 1. Constraints and decision summary
@@ -14,7 +14,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
   - LeRobot `v0.6.0` with the `smolvla` feature set, Python `3.12`, PyTorch `2.8.0+cu128`, TorchCodec `0.7.x`, NumPy `2.2.x`.
   - ROS 2 Humble on Ubuntu 22.04 using its native Python `3.10`, communicating with Isaac Sim through DDS and the Isaac Sim ROS 2 bridge.
 - The restarted container now passes the static hardware/resource preflight: one usable RTX 5090, a 25-CPU cgroup quota, 90 GiB RAM, 45 GiB shared memory, and 550 GiB on the data disk. The 30 GiB root filesystem remains intentionally code-only.
-- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 steps 1-6 established the contracts, task skeleton, deterministic reset/evaluation, immutable episode path, and instruction-bearing state-machine expert generation.
+- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 steps 1-6 established the contracts, task skeleton, deterministic reset/evaluation, immutable episode path, and instruction-bearing state-machine expert generation. Multi-episode expert generation remains the Stage 6 exit work; LeRobot/VLA training, closed-loop evaluation, RL refinement, ROS 2, and robustness are isolated in Stages 7-11.
 - Stage 2/3 execution occurred while the leased server was in no-GPU mode; this was acceptable for lock-only work and no GPU test was attempted. The GPU-mode hardware audit above remains the acceptance baseline for the later runtime stages.
 
 ## 2. Remote-machine audit
@@ -57,7 +57,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 | Isaac compatibility check | Official checker plus headless smoke test | Official checker passed; Vulkan, PhysX, RTX camera, Isaac Lab Franka/vectorization, RSL-RL, and WebRTC startup tests passed | Pass (Stage 4) |
 | VLA runtime check | Locked install plus imports, CUDA, media, dataset, inference, and PEFT smoke tests | PyTorch cu128 runs on `sm_120`; TorchCodec CPU decode, LeRobot dataset round trip, offline SmolVLA inference, and one LoRA optimizer step passed | Pass (Stage 5) |
 
-The former no-GPU/low-resource blocker was resolved by the GPU-mode audit. Stages 4 and 5 then completed in GPU allocations. Stage 6 steps 1-6 were later completed under explicit user direction. LeRobot conversion and VLA training remain outside the completed Stage 6 scope.
+The former no-GPU/low-resource blocker was resolved by the GPU-mode audit. Stages 4 and 5 then completed in GPU allocations. Stage 6 steps 1-6 were later completed under explicit user direction, while reviewed multi-episode expert generation remains pending. Contract-to-LeRobot conversion and VLA training are owned by Stage 7 rather than Stage 6.
 
 ## 3. Proposed repository structure
 
@@ -178,7 +178,7 @@ Isaac Sim 6.0/6.0.1 and Isaac Lab 3.0 beta/develop are not selected for the MVP.
 
 ## 6. Staged bootstrap plan
 
-Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were then separately approved and completed. Stage 6 steps 1-6 are complete. Stages 7-8 remain unauthorized.
+Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were then separately approved and completed. Stage 6 steps 1-6 are complete, with multi-episode generation pending. Stages 7-11 remain unauthorized.
 
 ### GPU-mode execution policy for Stages 4 and 5
 
@@ -379,7 +379,7 @@ Result:
   the VLA environment is 7.2 GiB, uv cache 32 GiB, and model directory 870 MiB. Miniconda base,
   NVIDIA driver 580.105.08, global CUDA/cuDNN paths, and global ROS state remain unchanged.
 
-### Stage 6 — Integrate demonstrations and policy evaluation
+### Stage 6 — Isaac Demonstration Pipeline
 
 - Steps 1-5 completed the versioned observation/action/episode contracts, Franka task skeleton,
   deterministic reset/evaluation interface, dependency boundary, and immutable NPY structural
@@ -395,15 +395,63 @@ Result:
   from task definitions; a task with different goal/evaluation semantics receives a new stable
   task identifier.
 - Collection remains in the Isaac Python 3.11 environment and writes one immutable episode per
-  environment. It must not import LeRobot. LeRobot conversion, VLA dataset validation, training,
-  and policy replay remain later reviewed work in the Python 3.12 VLA environment.
+  environment. It must not import LeRobot. Stage 7 owns LeRobot conversion, VLA dataset
+  validation, and training in the Python 3.12 VLA environment; Stage 8 owns policy replay.
 - The state-machine rollout was GPU-validated on 2026-08-25: one immutable 108-step success
   episode, including RGB observations and instruction/expert provenance, passed the file-level
   validator under the external dataset root. No package was changed and no VLA training ran.
+- The remaining Stage 6 work is reviewed multi-episode expert generation. Before collection,
+  define the episode count, unique IDs, seeds, instruction variants, and any controlled reset or
+  task variation. Publish one immutable directory per episode, validate every payload/manifest,
+  and emit a collection-level inventory and quality summary for Stage 7 ingestion.
 
-Exit gate: end-to-end pick-and-place round trip passes without cross-installing environments.
+Exit gate: a validated multi-episode Isaac demonstration corpus is ready for conversion without
+LeRobot or VLA dependencies in the Isaac runtime.
 
-### Stage 7 — Add ROS 2 deployment boundary
+### Stage 7 — LeRobot + VLA Training Pipeline
+
+- Define and implement the Contract → LeRobot feature/task mapping in the isolated Python 3.12
+  VLA environment.
+- Build a `LeRobotDataset` from validated Stage 6 episodes without mutating the raw source data.
+- Validate episode/frame counts, timestamps, image/action shapes, task/instruction mapping,
+  normalization inputs, and deterministic reload behavior.
+- Implement and validate SmolVLA preprocessing for the converted project dataset.
+- Run reviewed base inference on project observations and record finite outputs, latency, memory,
+  and action-schema compatibility.
+- Run bounded LoRA / PEFT fine-tuning, save full provenance, and verify adapter/checkpoint reload
+  plus offline evaluation before proposing longer training.
+- Treat the Stage 5 synthetic dataset, base inference, and one-step LoRA runs as environment
+  smokes only; they do not satisfy these project-data pipeline gates.
+
+Exit gate: the project demonstrations become a reproducible validated LeRobot dataset, and a
+reviewed SmolVLA base/adapter checkpoint passes offline validation.
+
+### Stage 8 — Closed-loop Policy Evaluation
+
+- Add a SmolVLA adapter from contract observations/instructions to policy inputs and from model
+  outputs back to the canonical action schema.
+- Run an Isaac inference loop across the isolated process/environment boundary; do not
+  cross-install Isaac and LeRobot.
+- Record success, failure, truncation, completion time, action validity, inference latency, and
+  rollout diagnostics.
+- Compare against the deterministic state-machine expert and unfine-tuned SmolVLA base policy.
+
+Exit gate: bounded closed-loop Isaac rollouts produce reproducible task metrics and a reviewed
+baseline comparison.
+
+### Stage 9 — RL Policy Refinement
+
+- Define reviewed PPO / SAC observations, actions, rewards, termination semantics, training
+  configuration, and simulation evaluation.
+- Establish standalone PPO/SAC baselines before combining learned controllers.
+- Add an optional bounded residual policy around the Stage 8 VLA action with explicit residual
+  scale, clipping, and safety limits.
+- Compare PPO/SAC and residual results against the closed-loop scripted and imitation baselines.
+
+Exit gate: RL and residual-policy results are reproducible, contract-compatible, and improve the
+reviewed metrics without violating action bounds.
+
+### Stage 10 — Add ROS 2 deployment boundary
 
 - Install ROS 2 Humble using the Ubuntu 22.04 binary path and build the overlay workspace.
 - Start with standard messages and separate external policy/control nodes.
@@ -412,10 +460,11 @@ Exit gate: end-to-end pick-and-place round trip passes without cross-installing 
 
 Exit gate: simulated sensor/state/language input reaches the policy node and safe actions reach the simulated controller.
 
-### Stage 8 — Reproducibility and robustness gate
+### Stage 11 — Reproducibility and robustness gate
 
 - Recreate each environment from locks in a clean location.
-- Run unit, integration, GPU smoke, dataset, ROS, and domain-randomization tests.
+- Run unit, integration, GPU smoke, dataset, closed-loop policy, RL, ROS, and
+  domain-randomization tests.
 - Capture versions, hardware, timings, VRAM/RAM peaks, and known limitations.
 
 Exit gate: a documented clean-room rebuild and MVP evaluation report succeed.
@@ -430,8 +479,8 @@ The Stage 0 approval accepted:
 4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
 
-Next review gate: define and review the Isaac-to-LeRobot conversion and VLA evaluation stage.
-LeRobot conversion and VLA training remain separate later gates.
+Next review gate: define and approve the Stage 6 multi-episode collection matrix and acceptance
+criteria. Contract-to-LeRobot conversion and VLA training remain the separate Stage 7 gate.
 
 ## 8. References
 
@@ -454,7 +503,9 @@ LeRobot conversion and VLA training remain separate later gates.
 - 2026-08-17: Initial proposal recorded after read-only audit. No packages installed or modified. Awaiting review.
 - 2026-08-17: Re-audited after restart in GPU mode. Confirmed one usable RTX 5090, driver 580.105.08, CUDA capability 12.0, 25-CPU quota, 90 GiB RAM, and 45 GiB shared memory. Removed the former hardware blocker and recorded invalid thread-count variables. No packages installed or modified; plan still awaits review.
 - 2026-08-20: Recorded explicit Stage 0 approval and authorization for Stage 2 and Stage 3 only.
-- 2026-08-20: Completed Stage 2 repository/storage bootstrap and initial Stage 3 uv definitions, lock resolution, and lock review. Stages 4-8 remain unapproved.
+- 2026-08-20: Completed Stage 2 repository/storage bootstrap and initial Stage 3 uv definitions,
+  lock resolution, and lock review. Under the roadmap numbering used on that date, Stages 4-8
+  remained unapproved.
 - 2026-08-20: Considered an A/B split for no-GPU installation and GPU validation, then cancelled it because the no-GPU allocation cannot reliably meet CPU/RAM installation needs. Stage 4 and Stage 5 now each install and validate entirely in GPU mode.
 - 2026-08-20: Added Isaac Lab v2.3.2 commit `37ddf626871758333d6ed89cf64ad702aef127d0` core/assets/tasks/RSL-RL source packages to the Isaac uv definition and lock before Stage 4. No environment was synchronized or installed.
 - 2026-08-20: Completed approved Stage 4 in GPU mode. Installed the locked Isaac Sim/Lab stack,
@@ -476,3 +527,8 @@ LeRobot conversion and VLA training remain separate later gates.
   configuration, and a GPU-validated collection entry point. The accepted 108-step episode
   passed immutable NPY validation. No dependency, environment, LeRobot, or training change was
   made.
+- 2026-08-27: Restructured the post-environment roadmap without changing code or dependencies.
+  Stage 6 now owns only the Isaac Demonstration Pipeline and retains completed steps 1-6, with
+  multi-episode generation pending. Added Stage 7 LeRobot + VLA Training, Stage 8 Closed-loop
+  Policy Evaluation, and Stage 9 RL Policy Refinement. Renumbered the former ROS 2 Stage 7 and
+  robustness Stage 8 to Stages 10 and 11.

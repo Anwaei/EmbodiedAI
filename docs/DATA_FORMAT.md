@@ -78,7 +78,7 @@ Stage 6 step 6 adds the following additive `embodied-ai.episode/v1` manifest fie
 ```
 
 `task` remains the machine-readable task definition. `instruction` is episode-invariant
-language and may vary across episodes with the same task. The VLA-side LeRobot converter will
+language and may vary across episodes with the same task. The Stage 7 LeRobot converter will
 map the exact instruction text to LeRobot's task/instruction representation and retain the
 stable task and expert provenance in conversion metadata. Expert provenance is never a model
 input.
@@ -117,7 +117,7 @@ not a manifest payload and not an additional training observation.
 - An episode is published atomically only after all payload files and the manifest are final.
 - An existing finalized episode directory is never overwritten. A repeated episode identifier
   is an error.
-- Conversion to LeRobot format is a validated, separate step in the VLA environment.
+- Conversion to LeRobot format is a validated, separate Stage 7 step in the VLA environment.
 - Checkpoints are accompanied by policy metadata that names the compatible schema and
   normalization statistics.
 - Every training demonstration has one task, one exact instruction, and one expert provenance

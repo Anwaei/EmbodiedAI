@@ -145,8 +145,8 @@ The following remain deferred after step 6:
 
 - production camera codec and finalized camera calibration metadata;
 - streaming/chunked recording for long episodes;
-- LeRobot feature mapping and normalization statistics;
-- VLA training and learned-policy inference.
+- Stage 7 LeRobot feature mapping and normalization statistics;
+- Stage 7 VLA training and Stage 8 learned-policy inference.
 
 These decisions must build on the v1 contracts and may not introduce LeRobot imports into
 the Isaac environment.

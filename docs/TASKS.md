@@ -86,10 +86,10 @@ mutually exclusive and are wired into Isaac Lab termination terms; the ten-secon
 remains a truncation. Reward remains an explicit zero placeholder because no training reward
 was approved.
 
-The following remain deferred:
+The following are owned by later stages:
 
-- LeRobot conversion of the expert demonstrations;
-- learned policy inference or VLA training.
+- Stage 7 LeRobot conversion and VLA training;
+- Stage 8 learned-policy inference and closed-loop evaluation.
 
 ## Stage 6 step 6: expert demonstration generation
 
@@ -216,7 +216,7 @@ scripts/sim/
 ```
 
 All simulator control and collection code remains in the Isaac environment, while LeRobot
-conversion remains a later VLA-environment step.
+conversion remains a Stage 7 VLA-environment step.
 
 ### Expert episode check
 
