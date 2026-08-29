@@ -61,10 +61,12 @@ contract. ROS 2 deployment and the final robustness gate remain separate Stages 
 
 ## Demonstration generation boundary
 
-Stage 6 step 6 keeps task semantics, language, control, and storage as separate concerns:
+Stage 6 keeps task semantics, language, controlled scene parameters, control, and storage as
+separate concerns:
 
 ```text
 task definition + instruction selection
+  -> versioned per-episode cube/goal parameters
   -> Isaac-side expert
   -> canonical ActionSchema action
   -> Isaac Lab step
@@ -83,6 +85,13 @@ task definition + instruction selection
 - The collector owns rollout lifecycle and recording; an expert does not write files. With
   vectorized environments, the collector maintains one recorder and one terminal outcome per
   environment rather than storing an environment batch as one episode.
+- `FrankaPickPlaceEpisodeParameters` is the single runtime source for the cube reset position and
+  goal position. Before environment creation it configures the cube default state, visual goal
+  marker, success termination, expert context, and manifest task/reset parameters.
+- The first batch implementation consumes a dependency-light, versioned TOML plan and launches one
+  fresh Isaac process per row. This preserves the accepted one-reset lifecycle. It writes one
+  immutable directory per episode and a separate atomic collection summary; it never combines an
+  environment batch dimension into one episode.
 
 ## Offline dataset conversion boundary
 
@@ -95,6 +104,8 @@ immutable Contract episode
   -> serial mmap-backed LeRobot writer
   -> finalize + reopen in a private directory
   -> atomic dataset publication + conversion provenance
+  -> independent source/dataset/statistics/reload validation
+  -> atomic derived validation report
 ```
 
 The mapping module depends only on the shared contracts. The converter runs only in the VLA
@@ -102,7 +113,11 @@ environment and may import NumPy and LeRobot; simulator code continues to reject
 The initial policy sees joint position and front RGB. Joint velocity is an explicit future mapping
 decision, while cube position is privileged simulator state and is never silently exposed to the
 VLA. Original episode directories remain immutable and traceable through manifest hashes in the
-conversion sidecar.
+conversion sidecar. The validator independently reopens both the immutable sources and the
+published `LeRobotDataset`: it compares the complete state/action/timestamp/index/task table,
+recomputes policy normalization inputs, decodes both boundaries of every episode through two
+fresh LeRobot instances, and writes its report below the external run root. Validation never
+changes the source episodes or converted dataset.
 
 ## Safety and scope
 

@@ -29,6 +29,7 @@ from embodied_ai.contracts.tasks.franka_pick_place import (
     GOAL_POSITION_ENV_M,
     IK_ROTATION_SCALE_RAD,
     IK_TRANSLATION_SCALE_M,
+    FrankaPickPlaceEpisodeParameters,
 )
 
 from . import evaluation as task_evaluation
@@ -249,7 +250,10 @@ class RewardsCfg:
 class TerminationsCfg:
     """Success, bounded-workspace failure, and time-limit terminations."""
 
-    success = DoneTerm(func=task_evaluation.task_success)
+    success = DoneTerm(
+        func=task_evaluation.task_success,
+        params={"goal_position_env_m": GOAL_POSITION_ENV_M},
+    )
     failure = DoneTerm(func=task_evaluation.task_failure)
     time_out = DoneTerm(func=isaac_mdp.time_out, time_out=True)
 
@@ -279,3 +283,20 @@ class FrankaPickPlaceEnvCfg(ManagerBasedRLEnvCfg):
         self.num_rerenders_on_reset = 2
         self.viewer.eye = (1.4, 1.2, 1.0)
         self.viewer.lookat = (0.5, 0.0, 0.15)
+
+
+def apply_episode_parameters(
+    env_cfg: FrankaPickPlaceEnvCfg,
+    parameters: FrankaPickPlaceEpisodeParameters,
+) -> None:
+    """Bind one reviewed episode specification before the Isaac environment is created."""
+
+    env_cfg.scene.cube.init_state.pos = parameters.cube_reset_position_env_m
+    goal = parameters.goal_position_env_m
+    # The semantic goal uses the cube-centre height, while the thin marker rests on the table.
+    env_cfg.scene.goal_marker.init_state.pos = (
+        goal[0],
+        goal[1],
+        GOAL_MARKER_SIZE_M[2] / 2.0,
+    )
+    env_cfg.terminations.success.params = {"goal_position_env_m": goal}

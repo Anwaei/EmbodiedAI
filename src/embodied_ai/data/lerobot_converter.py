@@ -147,6 +147,8 @@ def _source_record(source: _ValidatedSourceEpisode, episode_index: int) -> dict[
         "start_time_ns": metadata.start_time_ns,
         "end_time_ns": metadata.end_time_ns,
         "task": metadata.task,
+        "task_parameters": metadata.task_parameters,
+        "reset_parameters": metadata.reset_parameters,
         "instruction": metadata.instruction,
         "instruction_id": metadata.instruction_id,
         "instruction_language": metadata.instruction_language,

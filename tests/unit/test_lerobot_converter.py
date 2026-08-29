@@ -60,6 +60,8 @@ class LeRobotConverterTest(unittest.TestCase):
             random_seed=7,
             observation_schema=FRANKA_PICK_PLACE_OBSERVATION_SCHEMA,
             action_schema=FRANKA_PICK_PLACE_ACTION_SCHEMA,
+            task_parameters={"goal_position_env_m": [0.62, -0.18, 0.03]},
+            reset_parameters={"cube_position_env_m": [0.46, -0.05, 0.03]},
             provenance=EpisodeProvenance(
                 simulator_name="test-simulator",
                 simulator_version="1.0",
@@ -136,6 +138,14 @@ class LeRobotConverterTest(unittest.TestCase):
             )
             self.assertEqual(
                 conversion["source_episodes"][0]["expert"]["kind"], "state_machine"
+            )
+            self.assertEqual(
+                conversion["source_episodes"][0]["task_parameters"],
+                {"goal_position_env_m": [0.62, -0.18, 0.03]},
+            )
+            self.assertEqual(
+                conversion["source_episodes"][0]["reset_parameters"],
+                {"cube_position_env_m": [0.46, -0.05, 0.03]},
             )
 
             reloaded = self.dataset_type(repo_id, root=output)

@@ -102,6 +102,8 @@ class EpisodeContractTest(unittest.TestCase):
     def test_expert_demonstration_metadata_round_trip(self) -> None:
         metadata = replace(
             make_metadata(),
+            task_parameters={"goal_position_env_m": [0.65, -0.20, 0.03]},
+            reset_parameters={"cube_position_env_m": [0.50, 0.00, 0.03]},
             instruction="Pick up the cube and place it in the goal.",
             instruction_id="pick-place-cube-goal-en-001",
             instruction_language="en",
@@ -112,6 +114,16 @@ class EpisodeContractTest(unittest.TestCase):
 
         self.assertEqual(EpisodeMetadata.from_dict(encoded), metadata)
         self.assertEqual(encoded["expert"]["kind"], "state_machine")
+        self.assertEqual(
+            encoded["task_parameters"]["goal_position_env_m"],
+            [0.65, -0.20, 0.03],
+        )
+
+    def test_episode_parameters_are_json_safe(self) -> None:
+        with self.assertRaisesRegex(ValueError, "non-finite"):
+            replace(make_metadata(), task_parameters={"bad": float("nan")})
+        with self.assertRaisesRegex(ValueError, "JSON-compatible"):
+            replace(make_metadata(), reset_parameters={"bad": object()})
 
     def test_expert_demonstration_fields_are_atomic(self) -> None:
         with self.assertRaisesRegex(ValueError, "provided together"):

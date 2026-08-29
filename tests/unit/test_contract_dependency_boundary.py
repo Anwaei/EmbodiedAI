@@ -12,6 +12,7 @@ _ALLOWED_STANDARD_LIBRARY_ROOTS = {
     "math",
     "pathlib",
     "re",
+    "tomllib",
     "typing",
 }
 

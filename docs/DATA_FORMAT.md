@@ -83,10 +83,61 @@ map the exact instruction text to LeRobot's task/instruction representation and 
 stable task and expert provenance in conversion metadata. Expert provenance is never a model
 input.
 
+Step 7 records controlled spatial variation additively in the same manifest:
+
+```json
+{
+  "task_parameters": {
+    "goal_position_env_m": [0.62, -0.18, 0.03]
+  },
+  "reset_parameters": {
+    "cube_position_env_m": [0.46, -0.05, 0.03]
+  }
+}
+```
+
+The goal parameter drives the visible marker, expert target, and success termination. The reset
+parameter drives the per-environment cube default state. The original constants remain default
+values for existing fixed-reset tests.
+
 Raw collection may retain successful, failed, and truncated expert attempts, but only
 successful episodes are eligible for the initial imitation-learning training split by
 default. Dataset selection policy belongs to the later converter and must not mutate the raw
 immutable episode directories.
+
+## Expert collection layout
+
+```text
+stage6-expert-batch-v1-20260827/
+├── collection_summary.json
+├── episode-stage6-batch-v1-000001/
+├── episode-stage6-batch-v1-000002/
+└── ...
+```
+
+The versioned TOML collection plan is committed under
+`configs/sim/franka_pick_place/expert_collection_v1.toml`. The batch launcher validates the whole
+plan before execution, starts a fresh Isaac process for each row, reopens each published episode
+through `validate_npy_episode()`, and atomically rewrites `collection_summary.json` after every
+result. The summary records the plan hash, requested/processed/success counts, per-episode
+parameters, outcome, frame count, manifest hash, and external log path. It is a collection index,
+not an episode payload.
+
+Run the reviewed first matrix from an Isaac project shell:
+
+```bash
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src "$EMBODIEDAI_ENVS/isaac/bin/python" \
+  scripts/sim/collect_franka_pick_place_expert_batch.py \
+  --output_root "$EMBODIEDAI_DATASETS/stage6-expert-batch-v1-20260827" \
+  --device cuda:0
+```
+
+On 2026-08-27 all 20 planned episodes succeeded. The corpus contains 2,138 frames, five exact
+instruction variants, five cube reset positions, four goal positions, and 20 unique manifest
+hashes. Individual episodes span 97-114 steps. The 308 MiB corpus has no private partial
+directories; `collection_summary.json` has SHA-256
+`a2705d03e8e15418100fd666ffa6b81b749cf404cdf8de27ccec4bc8131a2642`.
 
 ## Stage 7 LeRobot conversion
 
@@ -106,9 +157,9 @@ The destination is first written below a private sibling `.partial-*` directory.
 is finalized and reopened before a same-filesystem rename publishes the requested root. The
 converter refuses to overwrite an existing destination. It adds
 `meta/embodied_ai_conversion.json`, identified by `embodied-ai.lerobot-conversion/v1`, containing
-the mapping, source manifest hashes, exact instruction IDs/text, expert provenance, source
-timestamps, and source-to-destination episode indices. These fields are provenance, not policy
-inputs.
+the mapping, source manifest hashes, exact instruction IDs/text, task/reset parameters, expert
+provenance, source timestamps, and source-to-destination episode indices. These fields are
+provenance, not policy inputs.
 
 Run the compact video-backed form from the isolated VLA environment:
 
@@ -117,7 +168,7 @@ source scripts/bootstrap/project_env.sh
 PYTHONPATH=src HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
 "$EMBODIEDAI_ENVS/vla/bin/python" \
   scripts/data/contract_episodes_to_lerobot.py \
-  "$EMBODIEDAI_DATASETS/<raw-collection>/<episode-id>" \
+  "$EMBODIEDAI_DATASETS/<raw-collection>"/<episode-id-pattern> \
   --output_root "$EMBODIEDAI_DATASETS/<converted-dataset>" \
   --repo_id embodiedai/<dataset-id> --storage videos
 ```
@@ -131,6 +182,45 @@ successfully published as
 one 20 Hz episode; the video-backed front camera is a 224 x 224 AV1 stream with 108 readable frames
 and a 5.4-second duration. The conversion sidecar retains the exact instruction, expert/source
 provenance, and source manifest SHA-256.
+
+The completed 20-episode corpus was converted on 2026-08-28 to
+`/root/autodl-tmp/EmbodiedAI/datasets/stage7-franka-pick-place-batch-v1` with repo ID
+`embodiedai/franka-pick-place-stage7-batch-v1`. It preserves all 20 episode boundaries, 2,138
+frames, five exact instruction tasks, and the source task/reset/expert provenance. Its single
+chunked front-camera AV1 file is 224 x 224 at 20 Hz and contains 2,138 readable frames over
+106.9 seconds. The complete dataset is 8.3 MiB and has no private partial directory.
+
+## Stage 7 LeRobot validation
+
+`src/embodied_ai/data/lerobot_validation.py` implements the independent validation gate and
+`scripts/data/validate_lerobot_dataset.py` provides the VLA-environment entry point. The validator:
+
+1. revalidates every immutable source payload and manifest hash;
+2. checks the conversion sidecar against exact source order, counts, instruction IDs/text,
+   task/reset parameters, expert provenance, and mapping revision;
+3. compares every LeRobot state/action value with the mapped source NPY values and checks all
+   episode/frame/global indices, 20 Hz timestamps, and task indices;
+4. recomputes finite 9D state and 7D action normalization inputs and compares min/max/mean/std/count
+   with LeRobot's stored statistics; and
+5. decodes the first and last front-camera frame of every episode through two independent
+   `LeRobotDataset` instances and requires exact reload equality.
+
+Run it without modifying either dataset:
+
+```bash
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/data/validate_lerobot_dataset.py \
+  --dataset_root "$EMBODIEDAI_DATASETS/stage7-franka-pick-place-batch-v1" \
+  --source_root "$EMBODIEDAI_DATASETS/stage6-expert-batch-v1-20260827" \
+  --repo_id embodiedai/franka-pick-place-stage7-batch-v1
+```
+
+The derived report is atomically written to
+`$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v1.json`; its schema is
+`embodied-ai.lerobot-validation/v1`. The accepted report passed for 20 episodes, 2,138 frames,
+five tasks, and 40 decoded episode-boundary image samples. No state/action dimension was constant.
+Its SHA-256 is `1758b137b4a90c62bd239eeaee8cf74dfdf3ca6d1b7626c414e81a44166f45ef`.
 
 ## Derived camera previews
 

@@ -3,7 +3,7 @@
 This document records the shared contract decisions introduced in Stage 6 step 1, the
 task-specific Franka contract instance added in step 2, the Stage 6 steps 3-5 simulator
 adapter and immutable episode publication decisions, and the additive metadata implemented
-for step 6 expert demonstrations.
+for step 6 expert demonstrations and step 7 parameterized batch collection.
 
 ## Boundary and dependency policy
 
@@ -139,6 +139,26 @@ only part of the group is rejected. This is an additive v1 change because existi
 already ignore unknown fields; any future change that alters the meaning of `task` or the
 action/observation boundary requires a new major schema.
 
+Stage 6 step 7 also adds optional JSON-safe `task_parameters` and `reset_parameters` mappings to
+the same episode v1 metadata. The initial Franka task records:
+
+```json
+{
+  "task_parameters": {"goal_position_env_m": [0.62, -0.18, 0.03]},
+  "reset_parameters": {"cube_position_env_m": [0.46, -0.05, 0.03]}
+}
+```
+
+The values are copied and recursively checked for JSON compatibility and finite floating-point
+numbers before publication. Older manifests without these fields remain valid. The first observed
+cube position is independently compared with the requested reset position after collection.
+
+The batch plan has its own `embodied-ai.expert-collection-plan/v1` identifier. It fixes the task,
+expert identity/configuration, and maximum horizon, then lists unique episode IDs, seeds,
+instruction variants, cube reset positions, and goal positions. It rejects duplicate IDs/seeds,
+inconsistent instruction-ID mappings, off-table positions, and cube resets already within the
+success tolerance. This plan is orchestration input rather than a policy observation.
+
 ## Stage 7 Contract to LeRobot mapping
 
 Stage 7 step 1 adds the separate mapping identifier
@@ -161,7 +181,7 @@ dependency-light description; only the Stage 7 converter imports NumPy and LeRob
 
 ## Deferred decisions
 
-The following remain deferred after step 6:
+The following remain deferred after step 7:
 
 - production camera codec and finalized camera calibration metadata;
 - streaming/chunked recording for long episodes;

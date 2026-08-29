@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import StrEnum
@@ -23,6 +24,41 @@ from .action import ActionSchema
 from .observation import ObservationSchema
 
 EPISODE_SCHEMA_VERSION = "embodied-ai.episode/v1"
+
+
+def _normalize_json_value(value: object, name: str) -> object:
+    """Return a JSON-safe copy so caller mutation cannot change a manifest later."""
+
+    if value is None or isinstance(value, (str, bool, int)):
+        return value
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            raise ValueError(f"{name} must not contain non-finite numbers")
+        return value
+    if isinstance(value, Mapping):
+        normalized: dict[str, object] = {}
+        for key, item in value.items():
+            if not isinstance(key, str) or not key:
+                raise ValueError(f"{name} keys must be non-empty strings")
+            normalized[key] = _normalize_json_value(item, f"{name}.{key}")
+        return normalized
+    if isinstance(value, (list, tuple)):
+        return [
+            _normalize_json_value(item, f"{name}[{index}]")
+            for index, item in enumerate(value)
+        ]
+    raise ValueError(f"{name} must contain only JSON-compatible values")
+
+
+def _normalize_parameters(value: object, name: str) -> dict[str, object] | None:
+    if value is None:
+        return None
+    source = require_mapping(value, name)
+    normalized = _normalize_json_value(source, name)
+    assert isinstance(normalized, dict)
+    if not normalized:
+        raise ValueError(f"{name} must not be empty when provided")
+    return normalized
 
 
 class EpisodeOutcome(StrEnum):
@@ -176,6 +212,8 @@ class EpisodeMetadata:
     termination_reason: str | None
     payloads: tuple[PayloadFile, ...]
     provenance: EpisodeProvenance
+    task_parameters: Mapping[str, object] | None = None
+    reset_parameters: Mapping[str, object] | None = None
     instruction: str | None = None
     instruction_id: str | None = None
     instruction_language: str | None = None
@@ -219,6 +257,16 @@ class EpisodeMetadata:
             raise ValueError("episode payload paths must be unique")
         if not isinstance(self.provenance, EpisodeProvenance):
             raise ValueError("provenance must be EpisodeProvenance")
+        object.__setattr__(
+            self,
+            "task_parameters",
+            _normalize_parameters(self.task_parameters, "task_parameters"),
+        )
+        object.__setattr__(
+            self,
+            "reset_parameters",
+            _normalize_parameters(self.reset_parameters, "reset_parameters"),
+        )
         language_fields = (
             self.instruction,
             self.instruction_id,
@@ -262,6 +310,10 @@ class EpisodeMetadata:
         }
         if self.termination_reason is not None:
             result["termination_reason"] = self.termination_reason
+        if self.task_parameters is not None:
+            result["task_parameters"] = dict(self.task_parameters)
+        if self.reset_parameters is not None:
+            result["reset_parameters"] = dict(self.reset_parameters)
         if self.expert is not None:
             # Expert fields are emitted as one atomic group so partial language metadata
             # can never masquerade as a training demonstration.
@@ -310,6 +362,8 @@ class EpisodeMetadata:
             provenance=EpisodeProvenance.from_dict(
                 require_mapping(source.get("provenance"), "episode provenance")
             ),
+            task_parameters=source.get("task_parameters"),
+            reset_parameters=source.get("reset_parameters"),
             instruction=source.get("instruction"),
             instruction_id=source.get("instruction_id"),
             instruction_language=source.get("instruction_language"),

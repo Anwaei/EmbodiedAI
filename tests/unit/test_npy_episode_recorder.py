@@ -86,6 +86,8 @@ class NpyEpisodeRecorderTest(unittest.TestCase):
             observation_schema=self.observation_schema,
             action_schema=self.action_schema,
             provenance=self.provenance,
+            task_parameters={"goal_position_env_m": [0.6, -0.2, 0.03]},
+            reset_parameters={"cube_position_env_m": [0.5, 0.0, 0.03]},
             instruction="Move the test object.",
             instruction_id="move-test-object-en-001",
             instruction_language="en",
@@ -127,6 +129,10 @@ class NpyEpisodeRecorderTest(unittest.TestCase):
             self.assertEqual(validated.end_time_ns, 50_000_000)
             self.assertEqual(validated.instruction, "Move the test object.")
             self.assertEqual(validated.expert, self.expert)
+            self.assertEqual(
+                validated.task_parameters,
+                {"goal_position_env_m": [0.6, -0.2, 0.03]},
+            )
             self.assertTrue((recorded.directory / "manifest.json").is_file())
             self.assertEqual(list(output_root.glob(".*.partial-*")), [])
             with self.assertRaisesRegex(RuntimeError, "finalized"):

@@ -10,6 +10,7 @@ import subprocess
 from importlib.metadata import version
 from pathlib import Path
 
+import numpy as np
 from isaaclab.app import AppLauncher
 
 from embodied_ai.contracts.tasks.franka_pick_place import (
@@ -41,6 +42,20 @@ parser.add_argument("--instruction", default=DEFAULT_INSTRUCTION)
 parser.add_argument("--instruction_id", default=DEFAULT_INSTRUCTION_ID)
 parser.add_argument("--instruction_language", default=DEFAULT_INSTRUCTION_LANGUAGE)
 parser.add_argument(
+    "--cube_reset_position_env_m",
+    nargs=3,
+    type=float,
+    metavar=("X", "Y", "Z"),
+    default=None,
+)
+parser.add_argument(
+    "--goal_position_env_m",
+    nargs=3,
+    type=float,
+    metavar=("X", "Y", "Z"),
+    default=None,
+)
+parser.add_argument(
     "--video_path",
     type=Path,
     default=None,
@@ -68,11 +83,13 @@ import embodied_ai.sim.tasks  # noqa: F401
 from embodied_ai.contracts import EpisodeOutcome, EpisodeProvenance
 from embodied_ai.contracts.tasks.franka_pick_place import (
     CONTROL_HZ,
+    CUBE_RESET_POSITION_ENV_M,
     FRANKA_PICK_PLACE_ACTION_SCHEMA,
     FRANKA_PICK_PLACE_OBSERVATION_SCHEMA,
     GOAL_POSITION_ENV_M,
     ROBOT_NAME,
     SCENE_NAME,
+    FrankaPickPlaceEpisodeParameters,
 )
 from embodied_ai.data.episode_video import encode_episode_camera_video
 from embodied_ai.sim.collection import collect_expert_episode
@@ -86,6 +103,7 @@ from embodied_ai.sim.tasks.franka_pick_place import TASK_ID
 from embodied_ai.sim.tasks.franka_pick_place.env_cfg import (
     CONTRACT_OBSERVATION_TERM_MAP,
     FrankaPickPlaceEnvCfg,
+    apply_episode_parameters,
 )
 
 
@@ -160,14 +178,23 @@ def main() -> None:
         raise ValueError("--seed must be non-negative")
 
     config, config_revision = load_state_machine_config(args_cli.expert_config)
+    episode_parameters = FrankaPickPlaceEpisodeParameters(
+        cube_reset_position_env_m=tuple(
+            args_cli.cube_reset_position_env_m or CUBE_RESET_POSITION_ENV_M
+        ),
+        goal_position_env_m=tuple(
+            args_cli.goal_position_env_m or GOAL_POSITION_ENV_M
+        ),
+    )
     task_context = ExpertTaskContext(
         task=args_cli.task,
         instruction=args_cli.instruction,
         instruction_id=args_cli.instruction_id,
         instruction_language=args_cli.instruction_language,
-        goal_position_env_m=GOAL_POSITION_ENV_M,
+        goal_position_env_m=episode_parameters.goal_position_env_m,
     )
     env_cfg = FrankaPickPlaceEnvCfg()
+    apply_episode_parameters(env_cfg, episode_parameters)
     env_cfg.scene.num_envs = 1
     env_cfg.sim.device = args_cli.device
     env_cfg.seed = args_cli.seed
@@ -193,6 +220,8 @@ def main() -> None:
             observation_schema=FRANKA_PICK_PLACE_OBSERVATION_SCHEMA,
             action_schema=FRANKA_PICK_PLACE_ACTION_SCHEMA,
             provenance=_provenance(args_cli.expert_config),
+            task_parameters=episode_parameters.task_parameters(),
+            reset_parameters=episode_parameters.reset_parameters(),
             instruction=task_context.instruction,
             instruction_id=task_context.instruction_id,
             instruction_language=task_context.instruction_language,
@@ -213,6 +242,17 @@ def main() -> None:
         validated = validate_npy_episode(result.recorded.directory)
         if validated != result.recorded.metadata:
             raise RuntimeError("validated expert metadata differs from the recorded manifest")
+        cube_positions = np.load(
+            result.recorded.directory / "observations/object_cube_position.npy",
+            allow_pickle=False,
+            mmap_mode="r",
+        )
+        expected_cube = np.asarray(episode_parameters.cube_reset_position_env_m)
+        if not np.allclose(cube_positions[0], expected_cube, rtol=0.0, atol=2e-3):
+            raise RuntimeError(
+                "first recorded cube position does not match the requested reset: "
+                f"actual={cube_positions[0].tolist()} expected={expected_cube.tolist()}"
+            )
 
         print(
             "STAGE6_EXPERT_RESULT",

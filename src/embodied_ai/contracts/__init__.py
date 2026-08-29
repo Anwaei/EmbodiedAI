@@ -6,6 +6,11 @@ from .action import (
     ActionRepresentation,
     ActionSchema,
 )
+from .collection import (
+    EXPERT_COLLECTION_PLAN_SCHEMA_VERSION,
+    ExpertCollectionEpisodeSpec,
+    ExpertCollectionPlan,
+)
 from .episode import (
     EPISODE_SCHEMA_VERSION,
     EpisodeManifest,
@@ -29,6 +34,7 @@ from .observation import (
 __all__ = [
     "ACTION_SCHEMA_VERSION",
     "EPISODE_SCHEMA_VERSION",
+    "EXPERT_COLLECTION_PLAN_SCHEMA_VERSION",
     "OBSERVATION_SCHEMA_VERSION",
     "ActionComponent",
     "ActionRepresentation",
@@ -38,6 +44,8 @@ __all__ = [
     "EpisodeMetadata",
     "EpisodeOutcome",
     "EpisodeProvenance",
+    "ExpertCollectionEpisodeSpec",
+    "ExpertCollectionPlan",
     "ExpertKind",
     "ExpertMetadata",
     "ObservationComponent",

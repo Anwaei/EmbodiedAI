@@ -47,6 +47,7 @@ def evaluate_cube_state(
     cube_position_env_m: torch.Tensor,
     cube_linear_velocity_w_m_s: torch.Tensor,
     gripper_open: torch.Tensor | None = None,
+    goal_position_env_m: tuple[float, float, float] = GOAL_POSITION_ENV_M,
 ) -> PickPlaceEvaluation:
     """Evaluate already adapted cube state without reading simulator handles."""
 
@@ -61,7 +62,7 @@ def evaluate_cube_state(
     if gripper_open.shape != (cube_position_env_m.shape[0],):
         raise ValueError("gripper_open must have shape (num_envs,)")
 
-    goal = cube_position_env_m.new_tensor(GOAL_POSITION_ENV_M).expand_as(
+    goal = cube_position_env_m.new_tensor(goal_position_env_m).expand_as(
         cube_position_env_m
     )
     position_error = torch.linalg.vector_norm(cube_position_env_m - goal, dim=-1)
@@ -98,6 +99,7 @@ def evaluate_cube_state(
 def evaluate_pick_place(
     env: ManagerBasedEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("cube"),
+    goal_position_env_m: tuple[float, float, float] = GOAL_POSITION_ENV_M,
 ) -> PickPlaceEvaluation:
     """Read the current scene and return the public vectorized task evaluation."""
 
@@ -112,16 +114,18 @@ def evaluate_pick_place(
         cube_position_env(env, asset_cfg),
         cube.data.root_lin_vel_w,
         gripper_open,
+        goal_position_env_m,
     )
 
 
 def task_success(
     env: ManagerBasedEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("cube"),
+    goal_position_env_m: tuple[float, float, float] = GOAL_POSITION_ENV_M,
 ) -> torch.Tensor:
     """Isaac Lab termination term for successful placement."""
 
-    return evaluate_pick_place(env, asset_cfg).success
+    return evaluate_pick_place(env, asset_cfg, goal_position_env_m).success
 
 
 def task_failure(

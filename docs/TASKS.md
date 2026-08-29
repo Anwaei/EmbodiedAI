@@ -88,8 +88,8 @@ was approved.
 
 The following are owned by later stages:
 
-- Stage 7 full real/multi-episode LeRobot conversion and VLA training; the versioned mapping and
-  bounded converter implementation are complete;
+- Stage 7 multi-episode LeRobot conversion/validation and VLA training; the versioned mapping,
+  bounded converter, and one-episode real conversion are complete;
 - Stage 8 learned-policy inference and closed-loop evaluation.
 
 ## Stage 6 step 6: expert demonstration generation
@@ -211,13 +211,35 @@ src/embodied_ai/sim/experts/
 src/embodied_ai/sim/collection/
 └── expert_rollout.py               # rollout/recorder lifecycle
 configs/sim/franka_pick_place/
-└── state_machine_expert.toml       # gains, thresholds, heights, and phase limits
+├── state_machine_expert.toml       # gains, thresholds, heights, and phase limits
+└── expert_collection_v1.toml       # reviewed 20-episode collection matrix
 scripts/sim/
-└── collect_franka_pick_place_expert.py
+├── collect_franka_pick_place_expert.py
+└── collect_franka_pick_place_expert_batch.py
 ```
 
 All simulator control and collection code remains in the Isaac environment, while LeRobot
 conversion remains a Stage 7 VLA-environment step.
+
+## Stage 6 step 7: parameterized expert batch
+
+Status: **implemented and GPU-validated on 2026-08-27**.
+
+The first batch keeps `task=franka-pick-place`, the robot, schemas, camera, physics, and
+state-machine configuration fixed. Its 20 rows cover five instruction paraphrases, five
+conservative cube reset positions, four goal positions, and unique seeds/episode IDs. A shared
+`FrankaPickPlaceEpisodeParameters` instance configures the cube default state, visible goal marker,
+success termination, expert goal, and manifest fields before each environment is created.
+
+One fresh Isaac process runs per row because repeated resets in one application remain outside the
+accepted lifecycle. Each child publishes one immutable NPY episode; the parent validates it and
+updates `collection_summary.json` atomically. Full child logs live under
+`$EMBODIEDAI_RUNS/stage6-expert-batch/stage6-franka-pick-place-expert-v1`.
+
+The accepted corpus is
+`$EMBODIEDAI_DATASETS/stage6-expert-batch-v1-20260827`. All 20 episodes succeeded, totaling 2,138
+frames with 97-114 steps per episode. The validator confirmed all payload hashes and parameter
+metadata, all 20 manifest hashes are unique, and no private partial directory remains.
 
 ### Expert episode check
 
@@ -318,3 +340,37 @@ Gym `reset(seed=...)` a second time after a manual step ended the application wi
 and no Python traceback. The accepted smoke follows the normal rollout boundary: one reset,
 then bounded steps. It verifies the first reset against the configured defaults. Automatic
 terminal reset behavior must receive a dedicated regression before expert collection begins.
+
+## Stage 7 steps 1-3: LeRobot conversion and validation
+
+Status: **implemented and validated on the 20-episode corpus on 2026-08-28**.
+
+Run the one-time conversion from the isolated VLA environment. The output directory must not
+already exist because converted datasets are immutable publications:
+
+```bash
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/data/contract_episodes_to_lerobot.py \
+  "$EMBODIEDAI_DATASETS/stage6-expert-batch-v1-20260827"/episode-stage6-batch-v1-* \
+  --output_root "$EMBODIEDAI_DATASETS/stage7-franka-pick-place-batch-v1" \
+  --repo_id embodiedai/franka-pick-place-stage7-batch-v1 \
+  --storage videos
+```
+
+Validate the published dataset and regenerate the derived report without changing either source
+or destination dataset:
+
+```bash
+PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/data/validate_lerobot_dataset.py \
+  --dataset_root "$EMBODIEDAI_DATASETS/stage7-franka-pick-place-batch-v1" \
+  --source_root "$EMBODIEDAI_DATASETS/stage6-expert-batch-v1-20260827" \
+  --repo_id embodiedai/franka-pick-place-stage7-batch-v1
+```
+
+The accepted dataset contains 20 episodes, 2,138 frames, and five exact instruction tasks at
+20 Hz. The validator performs full provenance and table comparison, normalization-statistics
+recomputation, and two-instance decoding of the first/last image in every episode. The report is
+`$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v1.json`. Step 4 SmolVLA
+preprocessing, inference, and training were not run.

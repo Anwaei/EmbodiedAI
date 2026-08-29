@@ -10,8 +10,8 @@
 | 3 | uv tooling, independent definitions, and lock review | Completed 2026-08-20; see `DEPENDENCY_LOCKS.md` |
 | 4 | Install and validate Isaac environment | Completed 2026-08-20; see `ENVIRONMENT.md` |
 | 5 | Install and validate VLA environment | Completed 2026-08-21; see `ENVIRONMENT.md` |
-| 6 | Isaac Demonstration Pipeline | In progress; single-episode pipeline completed 2026-08-26, multi-episode generation pending |
-| 7 | LeRobot + VLA Training Pipeline | In progress; steps 1-2 completed 2026-08-27 |
+| 6 | Isaac Demonstration Pipeline | Completed 2026-08-27; 20-episode expert corpus validated |
+| 7 | LeRobot + VLA Training Pipeline | In progress; steps 1-3 completed 2026-08-28 |
 | 8 | Closed-loop Policy Evaluation | Not approved |
 | 9 | RL Policy Refinement | Not approved |
 | 10 | ROS 2 deployment boundary | Not approved |
@@ -47,12 +47,13 @@ LeRobot or train policies.
    and expert provenance. The interfaces must allow instruction paraphrases, additional task
    definitions, and state-machine, learned-policy, or teleoperation experts without changing
    the recorder's observation/action boundary.
-7. Generate multiple expert episodes. **Pending.** Review a collection matrix covering episode
-   count, unique episode IDs, seeds, instruction variants, and any controlled reset/task
-   variation before generation. Publish one immutable directory per episode, validate every
-   manifest and payload, and produce a dataset-level collection summary suitable for Stage 7
-   ingestion. Raw episodes remain under the external dataset root; preview videos remain derived
-   artifacts.
+7. Generate multiple expert episodes. **Completed.** A versioned collection plan fixes the task
+   and state-machine expert while varying five instruction paraphrases, five cube reset positions,
+   and four goal positions across 20 unique seeds/episode IDs. The batch launcher uses one fresh
+   Isaac process per episode, validates every immutable manifest/payload, and atomically maintains
+   a collection summary. All 20 episodes succeeded on 2026-08-27 with 2,138 total frames and no
+   partial directories. Raw episodes remain under the external dataset root; preview videos remain
+   derived artifacts.
 
 Exit gate: a reviewed, validated multi-episode Isaac demonstration corpus is ready for conversion,
 without LeRobot or VLA dependencies in the Isaac runtime.
@@ -70,14 +71,17 @@ pipeline.
 2. Build a `LeRobotDataset` from validated Stage 6 episodes without mutating the raw source data.
    **Completed.** The converter validates source manifests/payloads, preserves
    source/expert provenance in a conversion sidecar, keeps one-to-one episode boundaries, and
-   atomically publishes a finalized/reopened local dataset. In GPU mode, the accepted 108-frame
-   Stage 6 expert episode was converted to a video-backed dataset at
-   `/root/autodl-tmp/EmbodiedAI/datasets/stage7-franka-pick-place-v1`. LeRobot reopened it as one
-   episode at 20 Hz, and the source manifest hash remained unchanged. The converter accepts
-   multiple source episode directories, but producing a larger corpus still depends on the
-   separate Stage 6 multi-episode collection gate.
+   atomically publishes a finalized/reopened local dataset. The completed Stage 6 corpus is now a
+   20-episode, 2,138-frame, five-instruction video-backed dataset at
+   `/root/autodl-tmp/EmbodiedAI/datasets/stage7-franka-pick-place-batch-v1`; its repo ID is
+   `embodiedai/franka-pick-place-stage7-batch-v1`.
 3. Validate episode counts, frames, timestamps, image/action shapes, task/instruction mapping,
-   normalization inputs, and deterministic reload behavior.
+   normalization inputs, and deterministic reload behavior. **Completed.** The independent
+   validator matched every state/action/table value and source provenance record, recomputed the
+   stored normalization statistics, decoded both boundaries of all 20 episodes through two fresh
+   LeRobot instances, and atomically wrote a passed report to
+   `/root/autodl-tmp/EmbodiedAI/runs/stage7-validation/stage7-franka-pick-place-batch-v1.json`.
+   The 224 x 224 AV1 stream independently reports 2,138 frames at 20 Hz over 106.9 seconds.
 4. Implement and validate SmolVLA preprocessing against the converted dataset.
 5. Run reviewed SmolVLA base inference on project observations and record finite outputs,
    latency, memory use, and action compatibility.

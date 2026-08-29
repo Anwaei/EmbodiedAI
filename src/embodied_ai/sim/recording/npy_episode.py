@@ -90,6 +90,8 @@ class NpyEpisodeRecorder:
         observation_schema: ObservationSchema,
         action_schema: ActionSchema,
         provenance: EpisodeProvenance,
+        task_parameters: Mapping[str, object] | None = None,
+        reset_parameters: Mapping[str, object] | None = None,
         instruction: str | None = None,
         instruction_id: str | None = None,
         instruction_language: str | None = None,
@@ -106,6 +108,8 @@ class NpyEpisodeRecorder:
         self.observation_schema = observation_schema
         self.action_schema = action_schema
         self.provenance = provenance
+        self.task_parameters = task_parameters
+        self.reset_parameters = reset_parameters
         self.instruction = instruction
         self.instruction_id = instruction_id
         self.instruction_language = instruction_language
@@ -265,6 +269,8 @@ class NpyEpisodeRecorder:
                 termination_reason=termination_reason,
                 payloads=tuple(payloads),
                 provenance=self.provenance,
+                task_parameters=self.task_parameters,
+                reset_parameters=self.reset_parameters,
                 instruction=self.instruction,
                 instruction_id=self.instruction_id,
                 instruction_language=self.instruction_language,

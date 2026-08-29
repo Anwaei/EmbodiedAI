@@ -1,0 +1,188 @@
+schema_version = "embodied-ai.expert-collection-plan/v1"
+collection_id = "stage6-franka-pick-place-expert-v1"
+task = "franka-pick-place"
+expert_identifier = "franka-pick-place-state-machine"
+expert_config = "configs/sim/franka_pick_place/state_machine_expert.toml"
+max_steps = 300
+
+# The first matrix varies language and conservative table positions while holding task,
+# robot, schemas, state-machine revision, camera, and physics configuration fixed.
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000001"
+seed = 1001
+instruction = "Pick up the cube and place it in the goal."
+instruction_id = "pick-place-cube-goal-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.46, -0.05, 0.03]
+goal_position_env_m = [0.62, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000002"
+seed = 1002
+instruction = "Move the cube to the green goal."
+instruction_id = "move-cube-green-goal-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.46, -0.05, 0.03]
+goal_position_env_m = [0.66, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000003"
+seed = 1003
+instruction = "Pick up the cube and set it on the green target."
+instruction_id = "pick-set-cube-green-target-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.46, -0.05, 0.03]
+goal_position_env_m = [0.62, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000004"
+seed = 1004
+instruction = "Place the cube inside the green goal area."
+instruction_id = "place-cube-green-goal-area-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.46, -0.05, 0.03]
+goal_position_env_m = [0.66, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000005"
+seed = 1005
+instruction = "Transfer the cube onto the green target."
+instruction_id = "transfer-cube-green-target-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.46, 0.05, 0.03]
+goal_position_env_m = [0.62, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000006"
+seed = 1006
+instruction = "Pick up the cube and place it in the goal."
+instruction_id = "pick-place-cube-goal-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.46, 0.05, 0.03]
+goal_position_env_m = [0.66, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000007"
+seed = 1007
+instruction = "Move the cube to the green goal."
+instruction_id = "move-cube-green-goal-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.46, 0.05, 0.03]
+goal_position_env_m = [0.62, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000008"
+seed = 1008
+instruction = "Pick up the cube and set it on the green target."
+instruction_id = "pick-set-cube-green-target-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.46, 0.05, 0.03]
+goal_position_env_m = [0.66, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000009"
+seed = 1009
+instruction = "Place the cube inside the green goal area."
+instruction_id = "place-cube-green-goal-area-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.50, -0.05, 0.03]
+goal_position_env_m = [0.62, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000010"
+seed = 1010
+instruction = "Transfer the cube onto the green target."
+instruction_id = "transfer-cube-green-target-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.50, -0.05, 0.03]
+goal_position_env_m = [0.66, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000011"
+seed = 1011
+instruction = "Pick up the cube and place it in the goal."
+instruction_id = "pick-place-cube-goal-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.50, -0.05, 0.03]
+goal_position_env_m = [0.62, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000012"
+seed = 1012
+instruction = "Move the cube to the green goal."
+instruction_id = "move-cube-green-goal-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.50, -0.05, 0.03]
+goal_position_env_m = [0.66, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000013"
+seed = 1013
+instruction = "Pick up the cube and set it on the green target."
+instruction_id = "pick-set-cube-green-target-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.50, 0.05, 0.03]
+goal_position_env_m = [0.62, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000014"
+seed = 1014
+instruction = "Place the cube inside the green goal area."
+instruction_id = "place-cube-green-goal-area-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.50, 0.05, 0.03]
+goal_position_env_m = [0.66, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000015"
+seed = 1015
+instruction = "Transfer the cube onto the green target."
+instruction_id = "transfer-cube-green-target-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.50, 0.05, 0.03]
+goal_position_env_m = [0.62, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000016"
+seed = 1016
+instruction = "Pick up the cube and place it in the goal."
+instruction_id = "pick-place-cube-goal-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.50, 0.05, 0.03]
+goal_position_env_m = [0.66, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000017"
+seed = 1017
+instruction = "Move the cube to the green goal."
+instruction_id = "move-cube-green-goal-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.54, 0.00, 0.03]
+goal_position_env_m = [0.62, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000018"
+seed = 1018
+instruction = "Pick up the cube and set it on the green target."
+instruction_id = "pick-set-cube-green-target-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.54, 0.00, 0.03]
+goal_position_env_m = [0.66, -0.18, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000019"
+seed = 1019
+instruction = "Place the cube inside the green goal area."
+instruction_id = "place-cube-green-goal-area-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.54, 0.00, 0.03]
+goal_position_env_m = [0.62, -0.22, 0.03]
+
+[[episodes]]
+episode_id = "episode-stage6-batch-v1-000020"
+seed = 1020
+instruction = "Transfer the cube onto the green target."
+instruction_id = "transfer-cube-green-target-en-001"
+instruction_language = "en"
+cube_reset_position_env_m = [0.54, 0.00, 0.03]
+goal_position_env_m = [0.66, -0.22, 0.03]
