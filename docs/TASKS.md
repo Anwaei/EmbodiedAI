@@ -374,3 +374,29 @@ The accepted dataset contains 20 episodes, 2,138 frames, and five exact instruct
 recomputation, and two-instance decoding of the first/last image in every episode. The report is
 `$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v1.json`. Step 4 SmolVLA
 preprocessing, inference, and training were not run.
+
+## Stage 7 steps 4-6: reviewed implementation sequence
+
+Status: **documentation only; no runnable command, code, processor, inference, or training job has
+been approved**.
+
+The implementation sequence is intentionally gated:
+
+1. Implement and review the VLA-only preprocessing/postprocessing package described in
+   `docs/SMOLVLA_PIPELINE.md`. Confirm project feature binding, explicit statistics, real-dataset
+   processor validation, action round trips, and failure cases before loading the model.
+2. After separate approval and a GPU-mode resource preflight, load the pinned base SmolVLA assets
+   locally and run the bounded compatibility probe. Review finite canonical 7D output,
+   deterministic noise handling, latency, memory, and provenance before the full offline baseline.
+3. Freeze an episode-level evaluation protocol and produce the base offline metrics. Do not call
+   this closed-loop success and do not start Isaac.
+4. After separate approval, freeze the 20-episode train/validation split and training-only
+   statistics, then run Step 6A's micro-overfit check and bounded PEFT feasibility job. Review
+   clean-process adapter reload and base-versus-adapter metrics.
+5. Do not begin Step 6B until a larger immutable corpus has repeated Stage 7 steps 1-3 and its
+   train/validation/test split is approved.
+
+All planned commands must use `$EMBODIEDAI_ENVS/vla`. Model, dataset, prediction, run, processor,
+and checkpoint artifacts must use the external data-disk roots configured by
+`scripts/bootstrap/project_env.sh`. Any package/lock change, new model download, dataset mutation,
+or Isaac execution is outside this plan and requires review.

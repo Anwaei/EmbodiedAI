@@ -11,7 +11,7 @@
 | 4 | Install and validate Isaac environment | Completed 2026-08-20; see `ENVIRONMENT.md` |
 | 5 | Install and validate VLA environment | Completed 2026-08-21; see `ENVIRONMENT.md` |
 | 6 | Isaac Demonstration Pipeline | Completed 2026-08-27; 20-episode expert corpus validated |
-| 7 | LeRobot + VLA Training Pipeline | In progress; steps 1-3 completed 2026-08-28 |
+| 7 | LeRobot + VLA Training Pipeline | In progress; steps 1-3 completed, steps 4-6 planned 2026-08-30 |
 | 8 | Closed-loop Policy Evaluation | Not approved |
 | 9 | RL Policy Refinement | Not approved |
 | 10 | ROS 2 deployment boundary | Not approved |
@@ -82,19 +82,34 @@ pipeline.
    LeRobot instances, and atomically wrote a passed report to
    `/root/autodl-tmp/EmbodiedAI/runs/stage7-validation/stage7-franka-pick-place-batch-v1.json`.
    The 224 x 224 AV1 stream independently reports 2,138 frames at 20 Hz over 106.9 seconds.
-4. Implement and validate SmolVLA preprocessing against the converted dataset.
-5. Run reviewed SmolVLA base inference on project observations and record finite outputs,
-   latency, memory use, and action compatibility.
-6. Run bounded LoRA / PEFT fine-tuning, save adapter/checkpoint provenance, and verify reload plus
-   offline evaluation before proposing a longer training run.
+4. Develop and validate the reusable SmolVLA preprocessing/postprocessing boundary. **Planned; not
+   implemented.** Explicitly replace the base checkpoint's 6D state, 6D action, and three-camera
+   processor metadata with the project dataset's 9D joint state, canonical 7D action, one front
+   RGB camera, exact instruction text, and explicit project statistics. Cover action-horizon and
+   padding-mask assembly, batching, tokenization, image handling, normalization, device placement,
+   action unnormalization, and contract validation without importing Isaac. The detailed design
+   and exit gate are in `docs/SMOLVLA_PIPELINE.md`.
+5. Develop the SmolVLA base offline-inference chain. **Planned; not implemented.** Load the already
+   pinned base model and tokenizer/config locally in the VLA environment, run deterministic
+   project-data compatibility probes and a causal dataset baseline, and record canonical 7D
+   predictions, finite/bounds checks, action metrics, latency, memory, and complete provenance.
+   This step does not run Isaac and cannot claim closed-loop task success.
+6. Develop fine-tuning in two reviewed substeps. **Planned; not implemented.** Step 6A uses a
+   deterministic episode-level split of the existing 20 episodes and a bounded LoRA/PEFT job to
+   prove train/validate/save/reload mechanics. Step 6B begins only after a larger corpus has passed
+   steps 1-3 again, then performs formal PEFT development with frozen train/validation/test splits,
+   training-only statistics, checkpoint selection, and held-out offline evaluation. Full-parameter
+   fine-tuning remains separately gated.
 
 Exit gate: a reproducible LeRobot dataset and reviewed SmolVLA adapter/checkpoint pass offline
 validation in the isolated VLA environment.
 
 ## Stage 8 — Closed-loop Policy Evaluation
 
-1. Implement a SmolVLA adapter that converts contract observations/instructions into policy
-   inputs and converts model outputs back to the canonical action schema.
+1. Reuse the Stage 7 processor boundary inside an online SmolVLA adapter. Stage 8 owns process
+   transport, action-chunk scheduling, timeout/safety handling, and conversion between live
+   contract messages and the already defined VLA-side inputs/outputs; it does not redefine the
+   Stage 7 feature or normalization policy.
 2. Implement the Isaac inference loop across the process/environment boundary without
    cross-installing Isaac and LeRobot stacks.
 3. Record task success, failure, truncation, completion time, action validity, inference latency,

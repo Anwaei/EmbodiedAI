@@ -1,7 +1,7 @@
 # Environment and Bootstrap Plan
 
 Status: **Stages 1-6 completed; Stage 7 steps 1-3 completed; Stages 8-11 not approved**
-Audit date: 2026-08-17 (hardware); roadmap structure updated 2026-08-27
+Audit date: 2026-08-17 (hardware); Stage 7 steps 4-6 plan updated 2026-08-30
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
 ## 1. Constraints and decision summary
@@ -178,7 +178,7 @@ Isaac Sim 6.0/6.0.1 and Isaac Lab 3.0 beta/develop are not selected for the MVP.
 
 ## 6. Staged bootstrap plan
 
-Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were then separately approved and completed. Stage 6 steps 1-7 are complete. Stage 7 steps 1-2 were later approved and completed; the remaining Stage 7 work and Stages 8-11 remain unauthorized.
+Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were then separately approved and completed. Stage 6 steps 1-7 are complete. Stage 7 steps 1-3 were later approved and completed; steps 4-6 are now planned but remain unimplemented, and Stages 8-11 remain unauthorized.
 
 ### GPU-mode execution policy for Stages 4 and 5
 
@@ -440,13 +440,33 @@ LeRobot or VLA dependencies in the Isaac runtime.
   samples across two fresh LeRobot instances. The 224 x 224 AV1 stream has 2,138 readable frames
   over 106.9 seconds. The passed atomic report is
   `/root/autodl-tmp/EmbodiedAI/runs/stage7-validation/stage7-franka-pick-place-batch-v1.json`.
-- Implement and validate SmolVLA preprocessing for the converted project dataset.
-- Run reviewed base inference on project observations and record finite outputs, latency, memory,
-  and action-schema compatibility.
-- Run bounded LoRA / PEFT fine-tuning, save full provenance, and verify adapter/checkpoint reload
-  plus offline evaluation before proposing longer training.
+- Develop and validate a reusable SmolVLA preprocessing/postprocessing package. **Planned; not
+  implemented.** It will explicitly bind the 9D state, one front RGB image, instruction, and 7D
+  action project features instead of loading the base checkpoint's incompatible 6D/three-camera
+  processor metadata unchanged. It will cover temporal action chunks and padding masks, batching,
+  tokenization, image preparation, explicit statistics selection, normalization, device transfer,
+  unnormalization, and action-contract validation. This work runs only in the VLA environment and
+  does not import or launch Isaac.
+- Deploy the pinned base SmolVLA model through that processor boundary and run reviewed offline
+  inference on project observations. **Planned; not implemented.** The run will use local pinned
+  model/tokenizer revisions and deterministic sampling noise; produce canonical 7D predictions;
+  report finite/bound/action metrics, latency, and peak GPU memory; and preserve complete
+  data/model/processor provenance. It is an offline compatibility baseline, not a closed-loop task
+  success result.
+- Develop fine-tuning in two separately reviewed substeps. **Planned; not implemented.** Step 6A
+  will use an episode-level split of the existing 20 episodes, training-only normalization
+  statistics, and a bounded LoRA/PEFT job to validate loss/gradient/update, save/reload, and held-out
+  offline evaluation mechanics. Step 6B will follow only after a larger versioned corpus is
+  converted and validated, and will add frozen train/validation/test splits, formal PEFT model
+  selection, and held-out evaluation. Full-parameter fine-tuning is not implicitly authorized.
 - Treat the Stage 5 synthetic dataset, base inference, and one-step LoRA runs as environment
   smokes only; they do not satisfy these project-data pipeline gates.
+
+The full Step 4-6 input definitions, module responsibilities, artifacts, resource policy, and exit
+gates are recorded in `docs/SMOLVLA_PIPELINE.md`. None of these steps requires the Isaac
+environment. Lightweight processor/contract unit work may be possible without a GPU, but the
+current 0.5-CPU/2-GiB no-GPU allocation is not accepted for full media processing, model
+inference, or fine-tuning; Steps 5, 6A, and 6B require a fresh GPU-mode resource preflight.
 
 Exit gate: the project demonstrations become a reproducible validated LeRobot dataset, and a
 reviewed SmolVLA base/adapter checkpoint passes offline validation.
@@ -504,8 +524,9 @@ The Stage 0 approval accepted:
 4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
 
-Next review gate: Stage 7 step 4 SmolVLA preprocessing against the validated project dataset.
-SmolVLA preprocessing, inference, and training have not been run in this stage.
+Next review gate: approve implementation of Stage 7 step 4 according to
+`docs/SMOLVLA_PIPELINE.md`. SmolVLA project-data preprocessing/postprocessing, offline inference,
+and fine-tuning have not been run.
 
 ## 8. References
 
@@ -581,3 +602,10 @@ SmolVLA preprocessing, inference, and training have not been run in this stage.
   Full validation passed for five instruction tasks and 40 decoded episode-boundary samples; the
   AV1 stream contains 2,138 frames at 20 Hz. No package, lock, driver, raw episode, SmolVLA
   preprocessing, inference, or training change was made.
+- 2026-08-30: Added the documentation-only Stage 7 steps 4-6 plan. Defined a project-owned
+  SmolVLA preprocessing/postprocessing boundary, a pinned-base offline-inference baseline, and
+  separate 20-episode PEFT-feasibility and expanded-dataset formal fine-tuning substeps. Clarified
+  the 9D/one-camera/7D project binding versus the base checkpoint's 6D/three-camera/6D processor
+  metadata, training-only statistics, episode-level splits, GPU gates, artifacts, and Stage 8
+  ownership. No source code, package, lock, dataset, model, processor, inference, or training state
+  was changed.

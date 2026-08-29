@@ -119,6 +119,39 @@ recomputes policy normalization inputs, decodes both boundaries of every episode
 fresh LeRobot instances, and writes its report below the external run root. Validation never
 changes the source episodes or converted dataset.
 
+## Offline SmolVLA processing and training boundary
+
+Stage 7 steps 4-6 remain entirely in the isolated VLA environment:
+
+```text
+validated LeRobotDataset
+  -> project feature binding + explicit statistics bundle
+  -> preprocessing (temporal batch, language, image, normalization, device)
+  -> pinned SmolVLA base + optional PEFT adapter
+  -> postprocessing (unnormalization, CPU transfer, canonical action validation)
+  -> offline predictions, metrics, checkpoints, and provenance
+```
+
+The base checkpoint's saved feature/processor metadata is not the project interface: it describes
+6D state, 6D action, and three cameras, while the first project dataset contains 9D joint state,
+canonical 7D action, and one front camera. A project-owned policy profile must therefore rebind
+input/output features and supply project statistics before loading compatible pretrained weights.
+It must never invent absent cameras, expose privileged cube position, or silently reuse the base
+checkpoint's incompatible normalization arrays.
+
+The preprocessing/postprocessing package may depend on LeRobot, SmolVLA, PyTorch, and the
+dependency-light contracts, but not on `embodied_ai.sim`, Isaac Sim, or Isaac Lab. Its output stays
+in the normalized end-effector-delta/gripper action contract. Offline postprocessing reports bound
+violations rather than hiding them with clipping. Stage 8 later reuses this package but separately
+owns process transport, model action-queue scheduling, timeouts, online safety clipping, and live
+Isaac interaction.
+
+Fine-tuning statistics are computed from training episodes only. Split manifests use whole
+episodes or scenarios, never individual frames across train/validation/test. Model, tokenizer,
+dataset, mapping, statistics, processor, split, configuration, lock, seed, and Git identities are
+recorded with every inference/training artifact. The detailed sequence and gates are in
+`docs/SMOLVLA_PIPELINE.md`.
+
 ## Safety and scope
 
 - The first task is Franka pick-and-place.
