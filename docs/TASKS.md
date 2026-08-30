@@ -241,6 +241,36 @@ The accepted corpus is
 frames with 97-114 steps per episode. The validator confirmed all payload hashes and parameter
 metadata, all 20 manifest hashes are unique, and no private partial directory remains.
 
+### Expanded 100-episode corpus for Step 6B
+
+Status: **collected and independently revalidated on 2026-08-30**.
+
+The second reviewed plan is
+`configs/sim/franka_pick_place/expert_collection_v2_100.toml`. It keeps task/expert/schema/camera/
+physics fixed and covers all 100 pairs formed by 10 conservative cube resets and 10 goals. The five
+instruction variants each occur 20 times and are balanced within every cube and goal axis.
+
+```bash
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src "$EMBODIEDAI_ENVS/isaac/bin/python" \
+  scripts/sim/collect_franka_pick_place_expert_batch.py \
+  --plan configs/sim/franka_pick_place/expert_collection_v2_100.toml \
+  --output_root "$EMBODIEDAI_DATASETS/stage6-expert-batch-v2-100-20260830" \
+  --device cuda:0 --episode_timeout_s 600
+```
+
+All 100 episodes succeeded and revalidated, with 10,707 total frames, 89-121 frames per episode,
+100 unique manifest hashes, and no private partial directory. The corpus occupies about 1.6 GiB.
+The plan and summary SHA-256 values are respectively
+`c16a14dc665872cde171d04a1ac6109e6244733fccdbf3979a1bd48bd33e8fb3` and
+`1c602a79a345cbbc8d29628fdf6b7a5797bc92e1faadba7c9a059f6ed07e2cff`. Full child logs are under
+`$EMBODIEDAI_RUNS/stage6-expert-batch/stage6-franka-pick-place-expert-v2-100`; all 100 are present
+and none contains a Python traceback.
+
+This is immutable Contract/NPY source data, not yet a `LeRobotDataset`. Before Step 6B, Stage 7
+steps 1-3 must publish and independently validate a new converted dataset without changing this
+source corpus or the existing 20-episode dataset.
+
 ### Expert episode check
 
 Run one deterministic expert rollout from an explicitly configured Isaac shell:
@@ -343,7 +373,8 @@ terminal reset behavior must receive a dedicated regression before expert collec
 
 ## Stage 7 steps 1-3: LeRobot conversion and validation
 
-Status: **implemented and validated on the 20-episode corpus on 2026-08-28**.
+Status: **implemented and validated on the 20-episode corpus on 2026-08-28; repeated successfully
+on the expanded 100-episode corpus on 2026-08-30**.
 
 Run the one-time conversion from the isolated VLA environment. The output directory must not
 already exist because converted datasets are immutable publications:
@@ -372,31 +403,71 @@ PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
 The accepted dataset contains 20 episodes, 2,138 frames, and five exact instruction tasks at
 20 Hz. The validator performs full provenance and table comparison, normalization-statistics
 recomputation, and two-instance decoding of the first/last image in every episode. The report is
-`$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v1.json`. Step 4 SmolVLA
-preprocessing, inference, and training were not run.
+`$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v1.json`.
 
-## Stage 7 steps 4-6: reviewed implementation sequence
+Repeat the same immutable conversion/validation cycle for the expanded corpus with:
 
-Status: **documentation only; no runnable command, code, processor, inference, or training job has
-been approved**.
+```bash
+PYTHONPATH=src HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+"$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/data/contract_episodes_to_lerobot.py \
+  "$EMBODIEDAI_DATASETS/stage6-expert-batch-v2-100-20260830"/episode-stage6-batch-v2-* \
+  --output_root "$EMBODIEDAI_DATASETS/stage7-franka-pick-place-batch-v2-100" \
+  --repo_id embodiedai/franka-pick-place-stage7-batch-v2-100 --storage videos
 
-The implementation sequence is intentionally gated:
+PYTHONPATH=src HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+"$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/data/validate_lerobot_dataset.py \
+  --dataset_root "$EMBODIEDAI_DATASETS/stage7-franka-pick-place-batch-v2-100" \
+  --source_root "$EMBODIEDAI_DATASETS/stage6-expert-batch-v2-100-20260830" \
+  --repo_id embodiedai/franka-pick-place-stage7-batch-v2-100
+```
 
-1. Implement and review the VLA-only preprocessing/postprocessing package described in
-   `docs/SMOLVLA_PIPELINE.md`. Confirm project feature binding, explicit statistics, real-dataset
-   processor validation, action round trips, and failure cases before loading the model.
-2. After separate approval and a GPU-mode resource preflight, load the pinned base SmolVLA assets
-   locally and run the bounded compatibility probe. Review finite canonical 7D output,
-   deterministic noise handling, latency, memory, and provenance before the full offline baseline.
-3. Freeze an episode-level evaluation protocol and produce the base offline metrics. Do not call
-   this closed-loop success and do not start Isaac.
-4. After separate approval, freeze the 20-episode train/validation split and training-only
-   statistics, then run Step 6A's micro-overfit check and bounded PEFT feasibility job. Review
-   clean-process adapter reload and base-versus-adapter metrics.
-5. Do not begin Step 6B until a larger immutable corpus has repeated Stage 7 steps 1-3 and its
-   train/validation/test split is approved.
+The second accepted dataset contains 100 episodes, 10,707 frames, five instruction tasks, and one
+224 x 224 AV1 stream at 20 Hz. Full source/sidecar/table/statistics validation and 200 first/last
+image decodes passed. The report is
+`$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v2-100.json` with SHA-256
+`7a133f00769ace6e552f3768f972f5b7e283c9e95fec12453521ccc859bd3d37`.
 
-All planned commands must use `$EMBODIEDAI_ENVS/vla`. Model, dataset, prediction, run, processor,
-and checkpoint artifacts must use the external data-disk roots configured by
-`scripts/bootstrap/project_env.sh`. Any package/lock change, new model download, dataset mutation,
-or Isaac execution is outside this plan and requires review.
+## Stage 7 steps 4, 5, and 6A: SmolVLA offline pipeline
+
+Status: **implemented and GPU-validated on 2026-08-30**. The expanded Step 6B candidate dataset is
+now converted and validated; a new whole-episode split and training-only statistics remain gated
+on review.
+
+The versioned run configuration and whole-episode split are
+`configs/policy/smolvla_franka_pick_place_v1.toml` and
+`configs/policy/smolvla_stage7_split_v1.json`. The split uses 15 training episodes (1,599 frames)
+and five validation episodes, with one validation episode per instruction and no frame leakage.
+Run the completed boundaries from the VLA environment only:
+
+```bash
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/evaluate/smolvla_processor_smoke.py
+PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/evaluate/smolvla_offline_inference.py
+PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/train/smolvla_stage7_peft.py
+PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
+  scripts/evaluate/smolvla_offline_inference.py \
+  --adapter_dir "$EMBODIEDAI_CHECKPOINTS/stage7-step6a/smolvla-lora-r2-steps50-v1" \
+  --processor_dir "$EMBODIEDAI_CHECKPOINTS/stage7-step6a/smolvla-lora-r2-steps50-v1/processors" \
+  --baseline_report "$EMBODIEDAI_RUNS/stage7-step5/smolvla-base-offline-v1/report.json" \
+  --output_dir "$EMBODIEDAI_RUNS/stage7-step6a/smolvla-lora-r2-steps50-v1-offline"
+```
+
+Step 4 publishes a reloadable 9D-state/one-camera/7D-action processor with training-only
+statistics below `$EMBODIEDAI_ARTIFACTS/stage7/processors`. Step 5 evaluates 15 deterministic
+first/middle/last anchors from the five held-out episodes: all outputs are finite and exactly
+repeatable, with base MAE/RMSE 0.4986/0.6787. Step 6A applies rank-2 LoRA to 92,832 of 450,139,008
+parameters. Its fixed-input three-step micro check decreases loss from 14.8492 to 14.7275; the
+50-step bounded job changes all 74 trainable tensors and reduces held-out flow-matching loss from
+5.8073 to 3.8950. A clean process reloads the saved adapter and processors successfully. Adapter
+MAE/RMSE are 0.5054/0.6943, slightly worse than base, so this is a feasibility result rather than
+evidence of generalization or closed-loop success.
+
+All commands use `$EMBODIEDAI_ENVS/vla`; large processor, prediction, run, and checkpoint artifacts
+remain on the external data disk. No package, lock, model, raw/converted dataset, Isaac environment,
+or NVIDIA driver was changed. The larger immutable corpus has now repeated Stage 7 steps 1-3, but
+Step 6B must not begin until its train/validation/test split and training configuration are reviewed.

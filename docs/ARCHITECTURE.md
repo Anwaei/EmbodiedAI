@@ -121,7 +121,7 @@ changes the source episodes or converted dataset.
 
 ## Offline SmolVLA processing and training boundary
 
-Stage 7 steps 4-6 remain entirely in the isolated VLA environment:
+Stage 7 steps 4-6 run entirely in the isolated VLA environment:
 
 ```text
 validated LeRobotDataset
@@ -139,7 +139,9 @@ input/output features and supply project statistics before loading compatible pr
 It must never invent absent cameras, expose privileged cube position, or silently reuse the base
 checkpoint's incompatible normalization arrays.
 
-The preprocessing/postprocessing package may depend on LeRobot, SmolVLA, PyTorch, and the
+The implemented `embodied_ai.policies.smolvla` package owns the reviewed profile, split/config
+parsing, preprocessing/postprocessing, local model loading, offline metrics, and bounded PEFT
+mechanics. The package may depend on LeRobot, SmolVLA, PyTorch, and the
 dependency-light contracts, but not on `embodied_ai.sim`, Isaac Sim, or Isaac Lab. Its output stays
 in the normalized end-effector-delta/gripper action contract. Offline postprocessing reports bound
 violations rather than hiding them with clipping. Stage 8 later reuses this package but separately

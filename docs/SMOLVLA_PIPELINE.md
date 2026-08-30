@@ -1,8 +1,8 @@
-# SmolVLA Offline Pipeline Plan
+# SmolVLA Offline Pipeline
 
-Status: **Stage 7 steps 4-6 planned; no implementation or model run has been approved**
+Status: **Steps 4, 5, and 6A completed on 2026-08-30; expanded data converted and validated; Step 6B awaits split and run-config review**
 
-This document defines the implementation plan for the VLA-only portion of Stage 7. It starts
+This document defines the design and execution record for the VLA-only portion of Stage 7. It starts
 from the validated local `LeRobotDataset` produced by steps 1-3 and ends with reviewed offline
 base-model and PEFT artifacts. It does not launch Isaac Sim or Isaac Lab, import
 `embodied_ai.sim`, or alter the simulator environment.
@@ -14,6 +14,11 @@ base-model and PEFT artifacts. It does not launch Isaac Sim or Isaac Lab, import
 - LeRobot repository identity: `embodiedai/franka-pick-place-stage7-batch-v1`
 - Dataset profile: `franka-pick-place-smolvla-v1`
 - Dataset contents: 20 episodes, 2,138 frames, five exact instructions, and 20 Hz control.
+- Expanded Step 6B candidate:
+  `/root/autodl-tmp/EmbodiedAI/datasets/stage7-franka-pick-place-batch-v2-100`, repo ID
+  `embodiedai/franka-pick-place-stage7-batch-v2-100`, with 100 episodes, 10,707 frames, five exact
+  instructions, and 20 Hz control. It passed the same mapping and independent validation gates on
+  2026-08-30; it does not alter the fixed 20-episode Step 4/5/6A execution record above.
 - Policy inputs: 9D Franka joint position, one front RGB image with shape `(3, 224, 224)`, and
   the exact instruction string. Joint velocity remains excluded and cube position remains
   privileged simulator state.
@@ -48,10 +53,10 @@ Dependency-light action/observation contracts may be imported. Isaac/Isaac Lab m
 environment creation, and simulator stepping are outside this pipeline. Step 8 will later own the
 online process boundary, action scheduling, and closed-loop Isaac interaction.
 
-The current no-GPU allocation is suitable for planning and lightweight contract/unit work only.
-Full dataset media processing, base inference, and fine-tuning require a fresh GPU-mode resource
-preflight. No new dependency is anticipated; any proposed package or lock change receives a
-separate review before execution.
+The accepted execution used the restarted GPU-mode allocation after a fresh resource preflight.
+No package or lock change was required. Future full dataset media processing, base inference, and
+fine-tuning runs still require a fresh GPU-mode resource preflight; any proposed package or lock
+change receives a separate review before execution.
 
 ## Step 4 — SmolVLA preprocessing and postprocessing
 
@@ -251,7 +256,10 @@ corpus are stated. A lower training loss alone is not sufficient.
 #### Prerequisites and scope
 
 1. Stage 6 publishes a larger, more diverse immutable expert corpus and Stage 7 steps 1-3 convert
-   and independently validate a new versioned `LeRobotDataset`.
+   and independently validate a new versioned `LeRobotDataset`. **Completed 2026-08-30:** 100
+   successful episodes, 10,707 frames, 10 cube resets, 10 goals, and five balanced instructions
+   were converted to `stage7-franka-pick-place-batch-v2-100`. Full provenance/table/statistics
+   validation and 200 deterministic boundary-image decodes passed.
 2. Freeze episode- or scenario-level train/validation/test splits that cover instruction, cube,
    goal, and later task diversity without frame leakage. The test split remains untouched until
    configuration selection is complete.
@@ -271,13 +279,54 @@ provenance; reproducible held-out offline metrics; and a documented configuratio
 Stage 8 closed-loop evaluation. Formal offline improvement does not itself establish simulator
 task success.
 
-## Approval sequence
+## Implementation record — 2026-08-30
 
-1. Review this plan.
-2. Approve and implement Step 4; review processor tests and artifacts.
-3. Approve and run Step 5 in GPU mode; freeze its baseline protocol.
-4. Approve and run Step 6A in GPU mode.
-5. Expand and validate the dataset before separately approving Step 6B.
+The implementation is configuration-driven and VLA-only:
+
+- `src/embodied_ai/policies/smolvla/profile.py` defines the 9D/one-camera/7D project binding and
+  rejects incompatible dataset/model metadata;
+- `split.py` and `config.py` validate the committed whole-episode split and run configuration;
+- `processing.py` owns train/inference preprocessing, postprocessing, diagnostics, statistics,
+  serialization, and reload;
+- `runtime.py` verifies and loads only the pinned local base/VLM assets;
+- `dataset.py` opens the reviewed `LeRobotDataset` with policy-specific action horizons;
+- `offline.py` owns deterministic inference and action-space metrics;
+- `training.py` owns the bounded LoRA wrapper, optimizer, fixed-input micro-overfit check, and
+  held-out flow-matching loss.
+
+The accepted split is 15 training episodes (1,599 frames) and five validation episodes. Validation
+contains exactly one episode per instruction, all four goal settings, and four of five cube reset
+positions. Statistics are computed from training episodes only and serialized with the processor.
+
+Step 4 published
+`/root/autodl-tmp/EmbodiedAI/artifacts/stage7/processors/franka-pick-place-smolvla-v1-train-split-v1`.
+The real 50-step action horizon, padding masks, tokens, image/state/action shapes, save/reload
+parity, and action round trip passed; maximum round-trip absolute error was `5.96e-08`.
+
+Step 5 published predictions and a report under
+`/root/autodl-tmp/EmbodiedAI/runs/stage7-step5/smolvla-base-offline-v1`. It evaluated the
+first/middle/last frame of each validation episode (15 anchors). All outputs were finite and an
+identical rerun had zero maximum absolute difference. Base normalized-action MAE/RMSE were
+`0.498620`/`0.678683`; gripper-sign agreement was `0.3333`, bound-violation rate was `0.07619`, and
+mean warmed inference latency was about `0.142 s`. These are offline diagnostics, not task success.
+
+Step 6A published the adapter/checkpoint under
+`/root/autodl-tmp/EmbodiedAI/checkpoints/stage7-step6a/smolvla-lora-r2-steps50-v1` and reports under
+`/root/autodl-tmp/EmbodiedAI/runs/stage7-step6a`. Rank-2 LoRA made 92,832 of 450,139,008 parameters
+trainable (74 tensors). The fixed-input three-step micro check decreased loss from `14.849166` to
+`14.727476`. The 50-step bounded job changed all trainable tensors and reduced held-out
+flow-matching loss from `5.807343` to `3.894992`; peak allocated/reserved CUDA memory was about
+1.26/1.33 GiB. A clean process reloaded the adapter and its processors and reproduced the first
+probe exactly. Adapter MAE/RMSE were `0.505373`/`0.694298`, slightly worse than the unchanged base
+baseline, so the checkpoint proves training/save/reload mechanics only and is not promoted as an
+improved policy.
+
+## Remaining approval sequence
+
+Steps 4, 5, and 6A have passed their approved execution, and the expanded raw Contract corpus has
+now repeated Stage 7 steps 1-3 successfully. Review and freeze the expanded whole-episode split,
+training-only statistics, and formal run configuration before separately approving Step 6B.
+Stage 8 closed-loop work remains separately gated.
 
 No step implicitly authorizes package installation, lock modification, model download, dataset
 mutation, or Isaac execution.

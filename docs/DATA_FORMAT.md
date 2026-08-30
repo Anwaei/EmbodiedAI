@@ -139,6 +139,22 @@ hashes. Individual episodes span 97-114 steps. The 308 MiB corpus has no private
 directories; `collection_summary.json` has SHA-256
 `a2705d03e8e15418100fd666ffa6b81b749cf404cdf8de27ccec4bc8131a2642`.
 
+The expanded Step 6B input corpus uses
+`configs/sim/franka_pick_place/expert_collection_v2_100.toml` and is published at
+`/root/autodl-tmp/EmbodiedAI/datasets/stage6-expert-batch-v2-100-20260830`. Its 100 rows form the
+complete product of 10 conservative cube reset positions and 10 goal positions. Five instruction
+variants occur 20 times each and are balanced within both spatial axes. All 100 episodes succeeded
+on 2026-08-30, totaling 10,707 frames with 89-121 frames per episode. Independent full-corpus
+revalidation found 100 unique manifest hashes, no partial directories, 100 child logs, and no
+tracebacks. The raw corpus occupies about 1.6 GiB. The reviewed plan SHA-256 is
+`c16a14dc665872cde171d04a1ac6109e6244733fccdbf3979a1bd48bd33e8fb3`; the finalized
+`collection_summary.json` SHA-256 is
+`1c602a79a345cbbc8d29628fdf6b7a5797bc92e1faadba7c9a059f6ed07e2cff`.
+
+This expanded directory remains immutable Contract/NPY source data. On 2026-08-30 Stage 7 repeated
+steps 1-3 against it and published a separate versioned `LeRobotDataset`; the existing 20-episode
+raw and converted datasets were not extended or replaced.
+
 ## Stage 7 LeRobot conversion
 
 `src/embodied_ai/data/lerobot_mapping.py` owns the versioned feature/task mapping, while
@@ -190,6 +206,15 @@ frames, five exact instruction tasks, and the source task/reset/expert provenanc
 chunked front-camera AV1 file is 224 x 224 at 20 Hz and contains 2,138 readable frames over
 106.9 seconds. The complete dataset is 8.3 MiB and has no private partial directory.
 
+The expanded 100-episode corpus was converted on 2026-08-30 to
+`/root/autodl-tmp/EmbodiedAI/datasets/stage7-franka-pick-place-batch-v2-100` with repo ID
+`embodiedai/franka-pick-place-stage7-batch-v2-100`. The unchanged
+`franka-pick-place-smolvla-v1` mapping preserves all 100 episode boundaries, 10,707 frames, five
+exact instruction tasks, and all task/reset/expert provenance. Its single chunked 224 x 224 AV1
+front-camera file reports 10,707 readable frames at 20 Hz over 535.35 seconds. The dataset uses
+about 53 MiB of disk allocation (about 20.4 MiB apparent size), has no private partial directory,
+and reopens as 100 episodes through LeRobot 0.6.0.
+
 ## Stage 7 LeRobot validation
 
 `src/embodied_ai/data/lerobot_validation.py` implements the independent validation gate and
@@ -209,18 +234,21 @@ Run it without modifying either dataset:
 
 ```bash
 source scripts/bootstrap/project_env.sh
-PYTHONPATH=src "$EMBODIEDAI_ENVS/vla/bin/python" \
+PYTHONPATH=src HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 \
+"$EMBODIEDAI_ENVS/vla/bin/python" \
   scripts/data/validate_lerobot_dataset.py \
-  --dataset_root "$EMBODIEDAI_DATASETS/stage7-franka-pick-place-batch-v1" \
-  --source_root "$EMBODIEDAI_DATASETS/stage6-expert-batch-v1-20260827" \
-  --repo_id embodiedai/franka-pick-place-stage7-batch-v1
+  --dataset_root "$EMBODIEDAI_DATASETS/stage7-franka-pick-place-batch-v2-100" \
+  --source_root "$EMBODIEDAI_DATASETS/stage6-expert-batch-v2-100-20260830" \
+  --repo_id embodiedai/franka-pick-place-stage7-batch-v2-100
 ```
 
-The derived report is atomically written to
-`$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v1.json`; its schema is
-`embodied-ai.lerobot-validation/v1`. The accepted report passed for 20 episodes, 2,138 frames,
-five tasks, and 40 decoded episode-boundary image samples. No state/action dimension was constant.
-Its SHA-256 is `1758b137b4a90c62bd239eeaee8cf74dfdf3ca6d1b7626c414e81a44166f45ef`.
+The expanded derived report is atomically written to
+`$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v2-100.json`; its schema is
+`embodied-ai.lerobot-validation/v1`. It passed for 100 episodes, 10,707 frames, five tasks, and
+200 decoded episode-boundary image samples across deterministic reloads. Every 9D state and 7D
+action dimension varies, and all stored statistics were reproduced. The report SHA-256 is
+`7a133f00769ace6e552f3768f972f5b7e283c9e95fec12453521ccc859bd3d37`. The earlier 20-episode
+report remains at `$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v1.json`.
 
 ## Derived camera previews
 

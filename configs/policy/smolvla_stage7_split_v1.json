@@ -1,0 +1,31 @@
+{
+  "schema_version": "embodied-ai.stage7-split/v1",
+  "dataset_repo_id": "embodiedai/franka-pick-place-stage7-batch-v1",
+  "dataset_root_name": "stage7-franka-pick-place-batch-v1",
+  "mapping_profile": "franka-pick-place-smolvla-v1",
+  "train_episode_indices": [1, 2, 3, 4, 5, 8, 10, 11, 12, 13, 14, 15, 16, 17, 19],
+  "validation_episode_indices": [0, 6, 7, 18, 9],
+  "source_episode_ids": [
+    "episode-stage6-batch-v1-000001",
+    "episode-stage6-batch-v1-000002",
+    "episode-stage6-batch-v1-000003",
+    "episode-stage6-batch-v1-000004",
+    "episode-stage6-batch-v1-000005",
+    "episode-stage6-batch-v1-000006",
+    "episode-stage6-batch-v1-000007",
+    "episode-stage6-batch-v1-000008",
+    "episode-stage6-batch-v1-000009",
+    "episode-stage6-batch-v1-000010",
+    "episode-stage6-batch-v1-000011",
+    "episode-stage6-batch-v1-000012",
+    "episode-stage6-batch-v1-000013",
+    "episode-stage6-batch-v1-000014",
+    "episode-stage6-batch-v1-000015",
+    "episode-stage6-batch-v1-000016",
+    "episode-stage6-batch-v1-000017",
+    "episode-stage6-batch-v1-000018",
+    "episode-stage6-batch-v1-000019",
+    "episode-stage6-batch-v1-000020"
+  ],
+  "rationale": "Whole-episode 15/5 split. Validation contains exactly one episode for each instruction, all four goal positions, and four of five cube reset positions; no frame crosses the split."
+}
