@@ -286,14 +286,23 @@ environment reproduces the public success/failure semantics.
 
 ### Step 9.3 — Run the standalone PPO environment and integration smokes
 
+**Completed and GPU-validated on 2026-09-01.**
+
 Connect the RL task to RSL-RL, first with one environment and zero/random actions, then with a
 small vectorized headless run. Validate observation normalization, 7D action adaptation, episode
 reset isolation, reward accounting, logging, and checkpoint creation/reload.
+
+The accepted smoke used four vectorized environments and proved optimization, periodic checkpoint
+creation, manifest finalization, checkpoint reload, and resume advancement. The resumed run loaded
+`model_0.pt` and produced `model_1.pt`. Both runs stayed below the external Stage 9 run root and
+imported no RGB, language, LeRobot, or VLA code.
 
 Exit gate: a short PPO optimization job advances, resets, saves, reloads, and resumes without RGB,
 language, LeRobot, or partial artifacts. Task success is not required for this engineering smoke.
 
 ### Step 9.4 — Train the standalone PPO baseline
+
+**Initial baseline completed and GPU-evaluated on 2026-09-01.**
 
 Run a bounded tuning progression: conservative fixed geometry, the training geometry distribution,
 then multiple fixed seeds. Save periodic and best checkpoints using validation success first and
@@ -302,6 +311,41 @@ KL, throughput, VRAM, and wall time.
 
 Exit gate: the selected checkpoint is reproducible, beats zero/random controls on held-out
 scenarios, and its result is reported even if it does not beat the scripted expert.
+
+The first bounded training progression produced the following evidence:
+
+- the v1 fixed-geometry pilot ran 200 updates over 128 environments; its first distribution
+  continuation exposed reward hacking because grasp/lift return rose while task success fell to
+  zero;
+- reward profile v2 gates grasp and lift shaping to their active phases, adds a public workspace
+  failure penalty, and raises place/success emphasis;
+- the v2 fixed run resumed from the v1 `model_125.pt`, ran 300 updates over 128 environments
+  (921,600 simulator steps), saved 13 checkpoints, and completed in about 10 minutes 15 seconds;
+- a v2 distribution continuation ran 100 further updates (307,200 simulator steps), but none of
+  its five checkpoints succeeded on the frozen scenarios;
+- checkpoint selection used success count first and mean return second. The selected fixed
+  `model_175.pt` achieved 1/10 success with mean return 5.687, versus 0/10 and returns 0.013 and
+  -0.147 for zero and random controls. An independent rerun reproduced the same success scenario
+  and aggregate metrics;
+- the result is a weak privileged-state baseline, not a robust solved policy: nine scenarios
+  timed out, raw action saturation was 48.1%, and the geometry-distribution continuation scored
+  0/10. Later high-return checkpoints were rejected because they scored 0/10.
+
+The engineering exit gate is therefore met narrowly: a provenance-complete checkpoint is
+reproducible and beats both controls on the frozen suite. The robustness objective is not met and
+must not be inferred from this result. Future tuning should use transition/progress shaping or a
+curriculum before spending compute on longer runs.
+
+Accepted artifacts are external to Git:
+
+```text
+$EMBODIEDAI_RUNS/stage9/stage9-franka-pick-place-standalone-ppo-v2/
+  fixed-reward-v2-seed-20260901-from-v1-fixed125/
+  distribution-reward-v2-seed-20260901-from-v2-fixed175/
+  evaluations/fixed-v2-checkpoint-sweep-20260901/evaluation.json
+  evaluations/distribution-v2-checkpoint-sweep-20260901/evaluation.json
+  evaluations/selected-fixed175-repro-20260901/evaluation.json
+```
 
 ### Step 9.5 — Implement and verify the residual contracts and composer
 

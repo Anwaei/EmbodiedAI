@@ -115,6 +115,7 @@ class Stage9RewardConfig:
     lift_weight: float
     place_weight: float
     success_weight: float
+    failure_weight: float
     action_magnitude_weight: float
     action_rate_weight: float
     gripper_toggle_weight: float
@@ -225,6 +226,7 @@ class Stage9StandalonePpoConfig:
             lift_weight=_finite(reward["lift_weight"], "lift_weight", positive=True),
             place_weight=_finite(reward["place_weight"], "place_weight", positive=True),
             success_weight=_finite(reward["success_weight"], "success_weight", positive=True),
+            failure_weight=_finite(reward["failure_weight"], "failure_weight", positive=True),
             action_magnitude_weight=_finite(
                 reward["action_magnitude_weight"], "action_magnitude_weight", positive=True
             ),
@@ -299,7 +301,7 @@ class Stage9StandalonePpoConfig:
 
 
 def reviewed_stage9_config_path(repository_root: Path) -> Path:
-    return repository_root / "configs" / "rl" / "franka_pick_place_standalone_ppo_v1.toml"
+    return repository_root / "configs" / "rl" / "franka_pick_place_standalone_ppo_v2.toml"
 
 
 __all__ = [

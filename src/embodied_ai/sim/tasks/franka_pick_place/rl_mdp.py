@@ -336,6 +336,12 @@ def success_bonus(env: ManagerBasedRLEnv) -> torch.Tensor:
     return task_success_dynamic_goal(env).to(dtype=torch.float32)
 
 
+def failure_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Return the public workspace-failure mask for terminal penalty weighting."""
+
+    return task_failure_dynamic(env).to(dtype=torch.float32)
+
+
 def action_magnitude_penalty(env: ManagerBasedRLEnv) -> torch.Tensor:
     return rl_terms.action_magnitude_penalty(env.action_manager.action)
 
@@ -404,6 +410,48 @@ def reset_franka_pick_place_rl(
         dim=-1,
     )
 
+    set_franka_pick_place_rl_geometry(
+        env,
+        env_ids,
+        cube_position_env_m=cube_position,
+        goal_position_env_m=goal_position,
+    )
+
+
+def set_franka_pick_place_rl_geometry(
+    env: ManagerBasedRLEnv,
+    env_ids: torch.Tensor,
+    *,
+    cube_position_env_m: torch.Tensor,
+    goal_position_env_m: torch.Tensor,
+) -> None:
+    """Apply exact per-environment cube/goal geometry after a reset.
+
+    Training reset sampling and held-out evaluation share this single write path,
+    which prevents the simulator marker and semantic runtime goal from diverging.
+    The caller remains responsible for resetting the robot when a fresh episode is
+    required.
+    """
+
+    count = int(env_ids.numel())
+    expected_shape = (count, 3)
+    if cube_position_env_m.shape != expected_shape:
+        raise ValueError(
+            f"cube_position_env_m must have shape {expected_shape}, "
+            f"got {tuple(cube_position_env_m.shape)}"
+        )
+    if goal_position_env_m.shape != expected_shape:
+        raise ValueError(
+            f"goal_position_env_m must have shape {expected_shape}, "
+            f"got {tuple(goal_position_env_m.shape)}"
+        )
+    cube_position = cube_position_env_m.to(device=env.device, dtype=torch.float32)
+    goal_position = goal_position_env_m.to(device=env.device, dtype=torch.float32)
+    if not torch.all(torch.isfinite(cube_position)) or not torch.all(
+        torch.isfinite(goal_position)
+    ):
+        raise ValueError("evaluation geometry must be finite")
+
     cube = env.scene["cube"]
     cube_state = cube.data.default_root_state[env_ids].clone()
     cube_state[:, :3] = cube_position + env.scene.env_origins[env_ids]
@@ -429,6 +477,7 @@ __all__ = [
     "action_magnitude_penalty",
     "action_rate_penalty",
     "bilateral_cube_contact",
+    "failure_penalty",
     "grasp_reward",
     "gripper_toggle_penalty",
     "invalid_state",
@@ -437,6 +486,7 @@ __all__ = [
     "reach_reward",
     "reset_franka_pick_place_rl",
     "runtime_goal_position",
+    "set_franka_pick_place_rl_geometry",
     "state_observation",
     "success_bonus",
     "task_failure_dynamic",

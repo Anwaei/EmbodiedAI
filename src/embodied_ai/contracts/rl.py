@@ -232,7 +232,7 @@ STANDALONE_PPO_ACTION_PROFILE = RlActionProfile(
     gripper_threshold=0.0,
 )
 
-STANDALONE_PPO_REWARD_PROFILE_ID = "franka-pick-place-staged-reward-v1"
+STANDALONE_PPO_REWARD_PROFILE_ID = "franka-pick-place-staged-reward-v2"
 
 RSL_RL_PPO_BACKEND = RlBackendIdentity(
     backend_id="rsl-rl",

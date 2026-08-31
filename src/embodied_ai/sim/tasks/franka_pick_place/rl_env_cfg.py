@@ -151,6 +151,10 @@ class FrankaPickPlacePPORewardsCfg:
         func=rl_mdp.success_bonus,
         weight=STAGE9_STANDALONE_CONFIG.reward.success_weight,
     )
+    failure = RewTerm(
+        func=rl_mdp.failure_penalty,
+        weight=-STAGE9_STANDALONE_CONFIG.reward.failure_weight,
+    )
     action_magnitude = RewTerm(
         func=rl_mdp.action_magnitude_penalty,
         weight=-STAGE9_STANDALONE_CONFIG.reward.action_magnitude_weight,

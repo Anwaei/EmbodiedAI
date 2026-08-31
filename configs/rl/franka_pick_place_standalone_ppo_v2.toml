@@ -1,0 +1,72 @@
+schema_version = "embodied-ai.stage9-run-config/v1"
+run_id = "stage9-franka-pick-place-standalone-ppo-v2"
+mode = "standalone_ppo"
+task_id = "EmbodiedAI-Franka-PickPlace-State-PPO-v0"
+
+[profiles]
+observation = "franka-pick-place-ppo-state-v1"
+action = "franka-pick-place-ppo-ee-delta-v1"
+reward = "franka-pick-place-staged-reward-v2"
+
+[backend]
+backend_id = "rsl-rl"
+algorithm = "ppo"
+package = "rsl-rl-lib"
+package_version = "3.1.2"
+isaaclab_rl_version = "0.4.7"
+
+[training]
+seed = 20260901
+num_envs = 128
+max_episode_steps = 200
+evaluation_scenarios_path = "configs/evaluation/stage8_scenarios_step6b_test_v1.json"
+
+[reset_distribution]
+cube_x_m = [0.445, 0.555]
+cube_y_m = [-0.075, 0.075]
+goal_x_m = [0.605, 0.695]
+goal_y_m = [-0.255, -0.145]
+cube_z_m = 0.03
+goal_z_m = 0.03
+
+[phase_thresholds]
+reach_distance_m = 0.065
+grasp_force_n = 0.5
+lift_height_m = 0.09
+place_distance_m = 0.08
+
+# v2 is the first Step 9.4 tuning revision. Grasp/lift rewards are stage-local,
+# terminal success dominates a single step, and workspace failure is explicit.
+[reward]
+reach_weight = 1.0
+grasp_weight = 2.0
+lift_weight = 4.0
+place_weight = 12.0
+success_weight = 200.0
+failure_weight = 100.0
+action_magnitude_weight = 0.01
+action_rate_weight = 0.005
+gripper_toggle_weight = 0.02
+reach_std_m = 0.10
+lift_target_height_m = 0.15
+place_std_m = 0.10
+
+[ppo]
+num_steps_per_env = 24
+max_iterations = 1500
+save_interval = 50
+actor_hidden_dims = [256, 128, 64]
+critic_hidden_dims = [256, 128, 64]
+init_noise_std = 1.0
+learning_rate = 0.0001
+gamma = 0.98
+lam = 0.95
+clip_param = 0.2
+entropy_coef = 0.006
+num_learning_epochs = 5
+num_mini_batches = 4
+desired_kl = 0.01
+max_grad_norm = 1.0
+
+[artifacts]
+output_dir = "runs/stage9/stage9-franka-pick-place-standalone-ppo-v2"

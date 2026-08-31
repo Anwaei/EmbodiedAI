@@ -95,8 +95,17 @@ def test_reward_terms_are_gated_and_penalties_are_non_negative() -> None:
     distance = torch.tensor([0.05, 0.05, 0.05])
 
     reach = rl_terms.reach_reward(distance, phase, std_m=0.1)
+    grasp = rl_terms.grasp_reward(torch.ones(3, dtype=torch.bool), phase)
+    lift = rl_terms.lift_reward(
+        torch.full((3,), 0.12),
+        phase,
+        resting_height_m=0.03,
+        target_height_m=0.15,
+    )
     place = rl_terms.place_reward(distance, phase, std_m=0.1)
     assert reach[0] > 0.0 and torch.all(reach[1:] == 0.0)
+    assert grasp[1] > 0.0 and grasp[0] == 0.0 and grasp[2] == 0.0
+    assert lift[1] > 0.0 and lift[0] == 0.0 and lift[2] == 0.0
     assert torch.all(place[:2] == 0.0) and place[2] > 0.0
 
     current = torch.tensor([[0.5, 0.0, 0.0, 0.0, 0.0, 0.0, -1.0]])

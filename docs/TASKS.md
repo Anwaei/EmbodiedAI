@@ -491,7 +491,8 @@ reviewed message fields, safety policy, metrics, matrix, and gates.
 
 ## Stage 9 steps 9.1-9.2: standalone PPO task foundation
 
-Status: **implemented and GPU-validated on 2026-08-31; PPO optimization has not started**.
+Status: **implemented and GPU-validated on 2026-08-31; Steps 9.3-9.4 were executed on
+2026-09-01**.
 
 The standalone state-policy task is registered separately as
 `EmbodiedAI-Franka-PickPlace-State-PPO-v0`. It reuses the existing Franka, table, cube, relative
@@ -520,5 +521,24 @@ PYTHONPATH=src "$EMBODIEDAI_ENVS/isaac/bin/python" \
 
 The accepted smoke reported `STAGE9_PPO_TASK_OK`, observation shape `(4, 52)`, action shape
 `(4, 7)`, finite rewards, independently sampled non-terminal resets, and matching installed
-`rsl-rl-lib 3.1.2`. It created no checkpoint or training artifact. Step 9.3 will add the first
-bounded PPO optimize/save/reload/resume smoke.
+`rsl-rl-lib 3.1.2`. It created no checkpoint or training artifact.
+
+## Stage 9 steps 9.3-9.4: standalone PPO smoke and initial baseline
+
+Status: **implemented, trained, and GPU-evaluated on 2026-09-01**.
+
+The project-owned training entry point now creates fail-closed run directories, atomic manifests,
+reviewed-config hashes, periodic checkpoints, and exact resume provenance. The evaluator runs
+zero, random, and any number of checkpoints against the ten frozen Stage 8 scenarios in one Isaac
+process and records per-scenario outcome, return, steps, maximum phase, and raw action saturation.
+
+The accepted v2 fixed run used 128 environments for 300 PPO updates after loading the v1 fixed
+`model_125.pt`; it produced 921,600 simulator steps and 13 checkpoints. A 100-update geometry-
+distribution continuation produced another 307,200 steps. The selected fixed `model_175.pt`
+reproducibly achieved 1/10 success and mean return 5.687, while zero and random controls achieved
+0/10. The distribution continuation achieved 0/10, so it was rejected.
+
+This is an engineering baseline, not a solved task. Nine held-out scenarios timed out and selected
+raw actions were saturated on 48.1% of values. Longer v1/v2 checkpoints also showed that increasing
+shaped return can reduce success by dwelling near the grasp/lift boundary. Exact run paths,
+selection evidence, and next reward/curriculum work are recorded in `docs/STAGE9_RL.md`.

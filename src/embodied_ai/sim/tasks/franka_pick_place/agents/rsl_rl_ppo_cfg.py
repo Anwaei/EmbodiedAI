@@ -17,6 +17,10 @@ class FrankaPickPlacePPORunnerCfg(RslRlOnPolicyRunnerCfg):
     save_interval = STAGE9_STANDALONE_CONFIG.ppo.save_interval
     experiment_name = STAGE9_STANDALONE_CONFIG.identity.run_id
     run_name = ""
+    obs_groups = {"policy": ["policy"], "critic": ["policy"]}
+    # The public action profile is normalized; clipping belongs at the RL adapter
+    # boundary so both the rollout buffer and Isaac receive the reviewed range.
+    clip_actions = 1.0
     policy = RslRlPpoActorCriticCfg(
         init_noise_std=STAGE9_STANDALONE_CONFIG.ppo.init_noise_std,
         actor_obs_normalization=True,

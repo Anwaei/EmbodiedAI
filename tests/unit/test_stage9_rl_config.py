@@ -29,6 +29,7 @@ def test_reviewed_standalone_ppo_config_loads_and_stays_external() -> None:
     assert config.output_dir.is_relative_to(data_root)
     assert config.ppo.num_steps_per_env == 24
     assert config.reward.lift_target_height_m > config.phase.lift_height_m
+    assert config.reward.failure_weight > 0.0
 
 
 def test_backend_versions_match_isaac_lock() -> None:

@@ -165,10 +165,11 @@ path still uses them inside the separate frozen VLA Policy Server.
 2. **Step 9.2 — Shared Isaac RL task layer. Completed.** Add vectorized low-dimensional state extraction,
    phase estimation, staged rewards, training resets, and compatible termination diagnostics
    without changing Stage 6 or Stage 8 behavior.
-3. **Step 9.3 — Standalone PPO integration smoke.** Run one-environment and small-vectorized
+3. **Step 9.3 — Standalone PPO integration smoke. Completed.** Run one-environment and small-vectorized
    optimize/save/reload/resume paths with the normalized 7D end-effector/gripper action.
-4. **Step 9.4 — Standalone PPO baseline training.** Train on a committed geometry distribution
-   and select checkpoints on held-out success and return across fixed seeds.
+4. **Step 9.4 — Standalone PPO baseline training. Initial baseline completed.** The first fixed and
+   geometry-distribution progression selected a reproducible 1/10 fixed checkpoint over 0/10
+   zero/random controls. Distribution robustness remains unsolved; see `docs/STAGE9_RL.md`.
 5. **Step 9.5 — Residual contracts/composer.** Implement a nominal-policy provider and
    `clip(clip(a_vla) + alpha * clip(a_rl))`; PPO controls only six arm dimensions and the nominal
    VLA retains the gripper channel.

@@ -147,10 +147,10 @@ def reach_reward(
 
 
 def grasp_reward(bilateral_contact: torch.Tensor, phase: torch.Tensor) -> torch.Tensor:
-    """Reward a current two-finger cube contact after the grasp transition."""
+    """Reward contact only while completing the grasp stage."""
 
     return bilateral_contact.to(dtype=torch.float32) * (
-        phase >= int(PickPlaceRlPhase.GRASP)
+        phase == int(PickPlaceRlPhase.GRASP)
     )
 
 
@@ -166,7 +166,7 @@ def lift_reward(
     progress = ((cube_height_m - resting_height_m) / (target_height_m - resting_height_m)).clamp(
         0.0, 1.0
     )
-    return progress * (phase >= int(PickPlaceRlPhase.GRASP))
+    return progress * (phase == int(PickPlaceRlPhase.GRASP))
 
 
 def place_reward(
