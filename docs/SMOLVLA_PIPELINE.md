@@ -326,7 +326,9 @@ improved policy.
 Steps 4, 5, and 6A have passed their approved execution, and the expanded raw Contract corpus has
 now repeated Stage 7 steps 1-3 successfully. Review and freeze the expanded whole-episode split,
 training-only statistics, and formal run configuration before separately approving Step 6B.
-Stage 8 closed-loop work remains separately gated.
+Stage 8 small-corpus closed-loop evaluation was separately approved on 2026-08-31. It reuses these
+processor/base/Step 6A artifacts through a loopback Robot Client + Policy Server boundary with
+receding-horizon `execute_horizon = 5`; it does not alter this offline pipeline.
 
 No step implicitly authorizes package installation, lock modification, model download, dataset
 mutation, or Isaac execution.

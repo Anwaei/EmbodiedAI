@@ -1,6 +1,6 @@
 # Environment and Bootstrap Plan
 
-Status: **Stages 1-6 completed; Stage 7 steps 1-5 and 6A completed; Step 6B split review pending; Stages 8-11 not approved**
+Status: **Stages 1-6 completed; Stage 7 steps 1-5 and 6A completed; Step 6B split review pending; Stage 8 approved; Stages 9-11 not approved**
 Audit date: 2026-08-17 (hardware); expanded Stage 7 steps 1-3 validation updated 2026-08-30
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
@@ -489,13 +489,26 @@ reviewed SmolVLA base/adapter checkpoint passes offline validation.
 
 ### Stage 8 — Closed-loop Policy Evaluation
 
-- Add a SmolVLA adapter from contract observations/instructions to policy inputs and from model
-  outputs back to the canonical action schema.
-- Run an Isaac inference loop across the isolated process/environment boundary; do not
-  cross-install Isaac and LeRobot.
-- Record success, failure, truncation, completion time, action validity, inference latency, and
-  rollout diagnostics.
-- Compare against the deterministic state-machine expert and unfine-tuned SmolVLA base policy.
+**Approved 2026-08-31** for the existing small-corpus base and Step 6A adapter. Stage 8 uses a
+loopback standard-library HTTP/JSON Robot Client + Policy Server boundary. It does not install or
+source ROS 2, cross-install Isaac/LeRobot, or expose a public service. The approved scheduler is
+SmolVLA `prediction_horizon = 50` with receding-horizon `execute_horizon = 5`.
+
+- Define dependency-light RPC, policy identity, scenario, and evaluation-rollout contracts.
+- Run the Policy Server only in the VLA environment and reuse the frozen Stage 7 feature,
+  processor, statistics, model, and adapter identities.
+- Run a one-environment Robot Client only in the Isaac environment. It owns contract extraction,
+  action safety/clipping, timeout behavior, five-action scheduling, simulator stepping, public
+  task evaluation, and atomic rollout recording.
+- Validate both sides first with protocol/fake-server/dependency tests, then run one real base
+  smoke, the five held-out scenarios with three fixed seeds, and a 45-rollout paired comparison of
+  state-machine expert, base SmolVLA, and Step 6A adapter.
+- Record outcome, goal error, completion time, raw/executed action diagnostics, queue behavior,
+  inference/round-trip latency, runtime/provenance, and optional preview video.
+- Publish the versioned comparison under `$EMBODIEDAI_RUNS/stage8`; evaluation rollouts are not
+  expert demonstrations or training data.
+
+The complete 8.1-8.8 design and exit gates are in `docs/STAGE8_EVALUATION.md`.
 
 Exit gate: bounded closed-loop Isaac rollouts produce reproducible task metrics and a reviewed
 baseline comparison.
@@ -540,9 +553,9 @@ The Stage 0 approval accepted:
 4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
 
-Next review gate: repeat Stage 7 steps 1-3 for the immutable 100-episode corpus, then review the
-formal Step 6B train/validation/test split and PEFT selection plan. Stage 8 closed-loop evaluation
-remains separately unauthorized.
+Next review gates: review the formal Step 6B train/validation/test split and PEFT selection plan;
+execute the separately approved Stage 8 small-corpus closed-loop evaluation. Stages 9-11 remain
+unauthorized.
 
 ## 8. References
 

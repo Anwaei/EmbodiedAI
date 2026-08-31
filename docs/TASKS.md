@@ -471,3 +471,20 @@ All commands use `$EMBODIEDAI_ENVS/vla`; large processor, prediction, run, and c
 remain on the external data disk. No package, lock, model, raw/converted dataset, Isaac environment,
 or NVIDIA driver was changed. The larger immutable corpus has now repeated Stage 7 steps 1-3, but
 Step 6B must not begin until its train/validation/test split and training configuration are reviewed.
+
+## Stage 8 steps 8.1-8.8: Robot Client + Policy Server closed-loop evaluation
+
+Status: **approved 2026-08-31; implementation pending**.
+
+The Policy Server runs from `$EMBODIEDAI_ENVS/vla`, binds only to `127.0.0.1`, and loads one base
+or adapter policy plus the reviewed small-corpus processor. The Robot Client runs from
+`$EMBODIEDAI_ENVS/isaac`, launches one headless Franka environment, and sends 9D joint state,
+front RGB, and instruction through versioned HTTP/JSON. It executes the first five actions from
+each 50-step response, then replans (`execute_horizon = 5`).
+
+Implementation order is: contracts/config/scenarios; Policy Server; Robot Client/scheduler;
+protocol and fake-server tests; one real base smoke; batch rollout/metrics; paired expert/base/
+Step 6A comparison; final reproducibility report. Outputs remain below
+`$EMBODIEDAI_RUNS/stage8`, never below the training dataset root. Exact commands and accepted
+artifacts will be recorded here after implementation. See `docs/STAGE8_EVALUATION.md` for the
+reviewed message fields, safety policy, metrics, matrix, and gates.

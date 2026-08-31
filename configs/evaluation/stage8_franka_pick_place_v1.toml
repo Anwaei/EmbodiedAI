@@ -1,0 +1,28 @@
+schema_version = "embodied-ai.stage8-run-config/v1"
+run_id = "stage8-small-corpus-v1"
+
+[server]
+host = "127.0.0.1"
+port = 8765
+request_timeout_s = 2.0
+max_payload_bytes = 524288
+
+[scheduler]
+control_hz = 20
+prediction_horizon = 50
+execute_horizon = 5
+max_episode_steps = 200
+
+[safety]
+hard_action_limit = 1.5
+
+[evaluation]
+scenarios_path = "configs/evaluation/stage8_scenarios_v1.json"
+policy_noise_seeds = [20260830, 20260831, 20260832]
+record_video = true
+
+[artifacts]
+stage7_run_config = "configs/policy/smolvla_franka_pick_place_v1.toml"
+processor_dir = "artifacts/stage7/processors/franka-pick-place-smolvla-v1-train-split-v1"
+adapter_dir = "checkpoints/stage7-step6a/smolvla-lora-r2-steps50-v1"
+expert_config = "configs/sim/franka_pick_place/state_machine_expert.toml"

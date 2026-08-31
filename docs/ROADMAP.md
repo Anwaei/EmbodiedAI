@@ -12,7 +12,7 @@
 | 5 | Install and validate VLA environment | Completed 2026-08-21; see `ENVIRONMENT.md` |
 | 6 | Isaac Demonstration Pipeline | Completed; 20-episode baseline and 100-episode expanded corpus validated |
 | 7 | LeRobot + VLA Training Pipeline | In progress; steps 1-5 and 6A complete; expanded 6B dataset converted/validated, split review pending |
-| 8 | Closed-loop Policy Evaluation | Not approved |
+| 8 | Closed-loop Policy Evaluation | Approved 2026-08-31; Robot Client + Policy Server implementation pending |
 | 9 | RL Policy Refinement | Not approved |
 | 10 | ROS 2 deployment boundary | Not approved |
 | 11 | Reproducibility and robustness gate | Not approved |
@@ -122,16 +122,26 @@ validation in the isolated VLA environment.
 
 ## Stage 8 — Closed-loop Policy Evaluation
 
-1. Reuse the Stage 7 processor boundary inside an online SmolVLA adapter. Stage 8 owns process
-   transport, action-chunk scheduling, timeout/safety handling, and conversion between live
-   contract messages and the already defined VLA-side inputs/outputs; it does not redefine the
-   Stage 7 feature or normalization policy.
-2. Implement the Isaac inference loop across the process/environment boundary without
-   cross-installing Isaac and LeRobot stacks.
-3. Record task success, failure, truncation, completion time, action validity, inference latency,
-   and rollout-level diagnostics.
-4. Compare the trained policy with reviewed baselines, initially the deterministic state-machine
-   expert and the unfine-tuned SmolVLA base policy.
+Stage 8 was approved on 2026-08-31 for the existing small-corpus base/Step 6A artifacts. It uses a
+loopback HTTP/JSON Robot Client + Policy Server boundary, not ROS 2. The accepted action scheduler
+uses a 50-step SmolVLA prediction with receding-horizon `execute_horizon = 5`.
+
+1. Define versioned RPC, policy identity, scenario, and rollout contracts.
+2. Implement a VLA-only Policy Server that reuses the Stage 7 processor and loads one pinned base
+   or PEFT adapter per process.
+3. Implement a one-environment Isaac Robot Client, five-action receding-horizon scheduler, online
+   action safety, timeout handling, and public task evaluation.
+4. Validate protocol, malformed responses, timeout, reset/queue semantics, and dependency
+   boundaries with a fake server before GPU integration.
+5. Run a single real two-process base-policy closed-loop smoke and atomically record its artifacts.
+6. Run the five held-out small-corpus scenarios with three fixed seeds per learned policy and
+   record task/action/latency/rollout metrics.
+7. Compare the scripted state-machine reference, unfine-tuned SmolVLA base, and Step 6A adapter on
+   the same 45-rollout matrix.
+8. Publish a reproducible JSON/human-readable report and handoff. Step 6B adapters can later be
+   added without changing the protocol or Robot Client.
+
+Detailed design and gates are in `docs/STAGE8_EVALUATION.md`.
 
 Exit gate: bounded closed-loop Isaac rollouts produce reproducible metrics and a baseline
 comparison report.

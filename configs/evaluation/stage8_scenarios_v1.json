@@ -1,0 +1,57 @@
+{
+  "schema_version": "embodied-ai.stage8-scenarios/v1",
+  "source_dataset_repo_id": "embodiedai/franka-pick-place-stage7-batch-v1",
+  "source_split": "configs/policy/smolvla_stage7_split_v1.json",
+  "scenarios": [
+    {
+      "scenario_id": "stage8-val-episode-000",
+      "source_episode_index": 0,
+      "simulator_seed": 1001,
+      "instruction": "Pick up the cube and place it in the goal.",
+      "instruction_id": "pick-place-cube-goal-en-001",
+      "instruction_language": "en",
+      "cube_reset_position_env_m": [0.46, -0.05, 0.03],
+      "goal_position_env_m": [0.62, -0.18, 0.03]
+    },
+    {
+      "scenario_id": "stage8-val-episode-006",
+      "source_episode_index": 6,
+      "simulator_seed": 1007,
+      "instruction": "Move the cube to the green goal.",
+      "instruction_id": "move-cube-green-goal-en-001",
+      "instruction_language": "en",
+      "cube_reset_position_env_m": [0.46, 0.05, 0.03],
+      "goal_position_env_m": [0.62, -0.22, 0.03]
+    },
+    {
+      "scenario_id": "stage8-val-episode-007",
+      "source_episode_index": 7,
+      "simulator_seed": 1008,
+      "instruction": "Pick up the cube and set it on the green target.",
+      "instruction_id": "pick-set-cube-green-target-en-001",
+      "instruction_language": "en",
+      "cube_reset_position_env_m": [0.46, 0.05, 0.03],
+      "goal_position_env_m": [0.66, -0.22, 0.03]
+    },
+    {
+      "scenario_id": "stage8-val-episode-018",
+      "source_episode_index": 18,
+      "simulator_seed": 1019,
+      "instruction": "Place the cube inside the green goal area.",
+      "instruction_id": "place-cube-green-goal-area-en-001",
+      "instruction_language": "en",
+      "cube_reset_position_env_m": [0.54, 0.0, 0.03],
+      "goal_position_env_m": [0.62, -0.22, 0.03]
+    },
+    {
+      "scenario_id": "stage8-val-episode-009",
+      "source_episode_index": 9,
+      "simulator_seed": 1010,
+      "instruction": "Transfer the cube onto the green target.",
+      "instruction_id": "transfer-cube-green-target-en-001",
+      "instruction_language": "en",
+      "cube_reset_position_env_m": [0.50, -0.05, 0.03],
+      "goal_position_env_m": [0.66, -0.18, 0.03]
+    }
+  ]
+}

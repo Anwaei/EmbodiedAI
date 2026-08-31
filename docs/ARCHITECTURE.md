@@ -59,6 +59,29 @@ contract. ROS 2 deployment and the final robustness gate remain separate Stages 
 - Standard ROS messages are preferred for the MVP. Custom interfaces require explicit
   Python 3.10 and Python 3.11 build validation.
 
+## Closed-loop evaluation boundary
+
+Stage 8 implements online evaluation as a Robot Client + Policy Server pair on one host:
+
+```text
+Isaac Python 3.11 Robot Client
+  -> versioned observation/instruction HTTP/JSON on 127.0.0.1
+VLA Python 3.12 Policy Server
+  -> postprocessed canonical 50 x 7 action chunk
+Robot Client
+  -> validate + safety clip + execute first 5 + replan
+```
+
+The transport uses only Python standard-library HTTP/JSON and base64 RGB for the first version.
+The Policy Server owns model/adapter loading, Stage 7 preprocessing/postprocessing, deterministic
+noise, inference, and model diagnostics; it must not import Isaac. The Robot Client owns live
+contract extraction, receding-horizon scheduling with `execute_horizon = 5`, action safety,
+timeouts, `env.step`, task evaluation, and rollout recording; it must not import LeRobot. Policy
+inference is synchronous and simulation time pauses while waiting. ROS 2 remains Stage 10.
+
+Stage 8 writes evaluation-specific rollout manifests under the external run root rather than
+reusing demonstration `ExpertMetadata` or publishing evaluation behavior as training data.
+
 ## Demonstration generation boundary
 
 Stage 6 keeps task semantics, language, controlled scene parameters, control, and storage as

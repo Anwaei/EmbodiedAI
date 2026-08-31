@@ -250,6 +250,20 @@ action dimension varies, and all stored statistics were reproduced. The report S
 `7a133f00769ace6e552f3768f972f5b7e283c9e95fec12453521ccc859bd3d37`. The earlier 20-episode
 report remains at `$EMBODIEDAI_RUNS/stage7-validation/stage7-franka-pick-place-batch-v1.json`.
 
+## Stage 8 evaluation rollouts
+
+Closed-loop evaluation output is a separate, versioned run artifact. It is not a Stage 6 expert
+episode and must never be added to a LeRobot training dataset implicitly. A Stage 8 rollout
+manifest identifies the scenario, instruction, task/reset parameters, policy/checkpoint/processor,
+RPC and observation/action schemas, deterministic policy-noise seed, `prediction_horizon = 50`,
+receding-horizon `execute_horizon = 5`, online clipping policy, simulator/VLA runtime, outcome,
+metrics, and payload hashes.
+
+Rollouts are atomically published below `$EMBODIEDAI_RUNS/stage8/<run-id>/rollouts`; they may
+contain raw/executed actions, inference timing records, task-state metrics, and a derived preview
+video. They use a policy identity rather than the demonstration-only `ExpertMetadata` group.
+Evaluation arrays and videos are not converter inputs.
+
 ## Derived camera previews
 
 Run the standalone converter from a configured project shell:
