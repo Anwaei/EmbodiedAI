@@ -129,7 +129,10 @@ def main() -> None:
     config = Stage8RunConfig.from_toml(
         args_cli.config, repository_root=repository_root, data_root=data_root
     )
-    scenarios = load_scenarios(config.scenarios_path)
+    scenarios = load_scenarios(
+        config.scenarios_path,
+        expected_count=config.expected_scenario_count,
+    )
     if args_cli.scenario_id is not None:
         scenarios = tuple(
             scenario for scenario in scenarios if scenario.scenario_id == args_cli.scenario_id

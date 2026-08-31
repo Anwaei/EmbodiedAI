@@ -180,4 +180,63 @@ class Stage7RunConfig:
         }
 
 
-__all__ = ["SMOLVLA_RUN_CONFIG_SCHEMA_VERSION", "Stage7RunConfig"]
+@dataclass(frozen=True, slots=True)
+class Stage7Step6BConfig:
+    """Formal multi-epoch settings layered on the shared Stage 7 run config."""
+
+    run: Stage7RunConfig
+    epochs: int
+    validation_every_epochs: int
+    keep_every_epoch_adapter: bool
+
+    def __post_init__(self) -> None:
+        if self.epochs != 5:
+            raise ValueError("the reviewed Stage 7 Step 6B run must use exactly 5 epochs")
+        if self.validation_every_epochs != 1:
+            raise ValueError("the reviewed Step 6B run validates after every epoch")
+        if self.keep_every_epoch_adapter is not True:
+            raise ValueError("the reviewed Step 6B run retains every epoch adapter")
+        reviewed_peft = (
+            self.run.peft_rank,
+            self.run.peft_alpha,
+            self.run.peft_dropout,
+            self.run.batch_size,
+            self.run.gradient_accumulation_steps,
+        )
+        if reviewed_peft != (8, 16, 0.05, 16, 1):
+            raise ValueError("formal Step 6B PEFT settings differ from the reviewed run")
+
+    @classmethod
+    def from_toml(
+        cls,
+        path: Path,
+        *,
+        repository_root: Path,
+    ) -> Stage7Step6BConfig:
+        run = Stage7RunConfig.from_toml(path, repository_root=repository_root)
+        with run.path.open("rb") as stream:
+            value: Any = tomllib.load(stream)
+        formal = _table(value.get("formal_peft"), "formal_peft")
+        return cls(
+            run=run,
+            epochs=formal.get("epochs"),
+            validation_every_epochs=formal.get("validation_every_epochs"),
+            keep_every_epoch_adapter=formal.get("keep_every_epoch_adapter"),
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "run": self.run.to_dict(),
+            "formal_peft": {
+                "epochs": self.epochs,
+                "validation_every_epochs": self.validation_every_epochs,
+                "keep_every_epoch_adapter": self.keep_every_epoch_adapter,
+            },
+        }
+
+
+__all__ = [
+    "SMOLVLA_RUN_CONFIG_SCHEMA_VERSION",
+    "Stage7RunConfig",
+    "Stage7Step6BConfig",
+]

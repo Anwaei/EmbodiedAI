@@ -1,10 +1,9 @@
 # Stage 8 Closed-loop Policy Evaluation
 
-Status: **approved 2026-08-31; implementation pending**
+Status: **implemented and evaluated on small-corpus and expanded Step 6B suites on 2026-08-31**
 
-Stage 8 evaluates the existing small-corpus SmolVLA base and Step 6A adapter in closed-loop Isaac
-rollouts. It does not wait for Step 6B, train a policy, introduce ROS 2, or combine Isaac and
-LeRobot in one interpreter.
+Stage 8 evaluates SmolVLA base and PEFT adapters in closed-loop Isaac rollouts. Training remains in
+Stage 7; Stage 8 does not introduce ROS 2 or combine Isaac and LeRobot in one interpreter.
 
 ## 1. Runtime boundary
 
@@ -165,8 +164,29 @@ instructions, all four goals, and four cube reset positions. The initial policy 
 | SmolVLA base | 15 | pinned base plus small-corpus train-only processor |
 | Step 6A LoRA adapter | 15 | feasibility adapter plus the same processor |
 
-Step 6B may later add another Policy Server launch target without changing the protocol, client,
-scheduler, recorder, scenario manifest, or metric definitions.
+The Step 6B run reused the same protocol, client, scheduler, recorder, and metric definitions with
+a new processor/checkpoint identity and a separately frozen expanded test-scenario manifest.
+
+## Expanded Step 6B matrix — 2026-08-31
+
+The expanded run uses `stage8_franka_pick_place_step6b_v1.toml` and the untouched formal test
+partition from `smolvla_stage7_split_v2_100.json`. Its 10 scenarios cover every cube reset and goal
+once and every instruction twice. Three policy-noise seeds produce 30 rollouts per policy and 90
+total. Each scenario runs in a fresh Isaac process; base and adapter each run behind a separate VLA
+Policy Server process with immutable policy identities.
+
+| Policy | Rollouts | Success | Outcome | Mean final goal error (m) | Mean steps |
+|---|---:|---:|---|---:|---:|
+| state-machine expert | 30 | 30 | 30 success | 0.00524 | 106.9 |
+| SmolVLA base | 30 | 0 | 30 safety errors | 0.25847 | 7.0 |
+| Step 6B rank-8 adapter | 30 | 0 | 30 safety errors | 0.25847 | 1.0 |
+
+The expert result validates all scenario/reset/success semantics. Base and Step 6B chunks exceeded
+the unchanged absolute hard action limit of 1.5 and failed closed; the client executed one safe
+zero action on the terminal frame and published the error artifact. The improved Step 6B offline
+MAE is therefore not evidence of a deployable closed-loop controller. The complete checksum-
+validated report is under
+`$EMBODIEDAI_RUNS/stage8/stage8-expanded-corpus-step6b-v1/reports`.
 
 ## 6. Initial configuration
 

@@ -259,10 +259,16 @@ RPC and observation/action schemas, deterministic policy-noise seed, `prediction
 receding-horizon `execute_horizon = 5`, online clipping policy, simulator/VLA runtime, outcome,
 metrics, and payload hashes.
 
-Rollouts are atomically published below `$EMBODIEDAI_RUNS/stage8/<run-id>/rollouts`; they may
+Rollouts are atomically published below
+`$EMBODIEDAI_RUNS/stage8/<run-id>/<policy-kind>/rollouts`; they may
 contain raw/executed actions, inference timing records, task-state metrics, and a derived preview
 video. They use a policy identity rather than the demonstration-only `ExpertMetadata` group.
 Evaluation arrays and videos are not converter inputs.
+
+The expanded Step 6B evaluation uses run ID `stage8-expanded-corpus-step6b-v1`. It contains 90
+validated manifests and 90 derived preview videos: 30 rollouts each for scripted expert, base, and
+the selected Step 6B adapter. Its scenario manifest is the frozen 10-episode test partition rather
+than training data, and the generated evaluation rollouts remain excluded from every converter.
 
 ## Derived camera previews
 

@@ -136,8 +136,28 @@ FRANKA_PICK_PLACE_SMOLVLA_PROFILE = SmolVLAProjectProfile(
     chunk_size=50,
 )
 
+
+def franka_pick_place_smolvla_profile(dataset_repo_id: str) -> SmolVLAProjectProfile:
+    """Bind the stable feature mapping to one immutable dataset repository identity."""
+
+    if not isinstance(dataset_repo_id, str) or not dataset_repo_id.strip():
+        raise ValueError("dataset_repo_id must be a non-empty string")
+    return SmolVLAProjectProfile(
+        name=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.name,
+        dataset_repo_id=dataset_repo_id,
+        state_key=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.state_key,
+        state_names=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.state_names,
+        image_key=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.image_key,
+        image_shape=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.image_shape,
+        action_key=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.action_key,
+        action_names=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.action_names,
+        control_hz=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.control_hz,
+        chunk_size=FRANKA_PICK_PLACE_SMOLVLA_PROFILE.chunk_size,
+    )
+
 __all__ = [
     "FRANKA_PICK_PLACE_SMOLVLA_PROFILE",
     "SMOLVLA_PROFILE_SCHEMA_VERSION",
     "SmolVLAProjectProfile",
+    "franka_pick_place_smolvla_profile",
 ]

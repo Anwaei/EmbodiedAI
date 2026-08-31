@@ -28,6 +28,7 @@ from embodied_ai.contracts.policy_rpc import (
 
 from .config import Stage7RunConfig
 from .processing import PROCESSOR_MANIFEST_NAME, load_project_processors, sha256_file
+from .profile import franka_pick_place_smolvla_profile
 from .runtime import (
     LocalSmolVLAAssets,
     fixed_noise,
@@ -50,17 +51,23 @@ class SmolVLAOnlineEngine:
     ) -> None:
         assets = LocalSmolVLAAssets.from_run_config(run_config)
         assets.verify()
-        self.processors = load_project_processors(processor_dir)
+        profile = franka_pick_place_smolvla_profile(run_config.dataset_repo_id)
+        self.processors = load_project_processors(processor_dir, profile=profile)
         if policy_kind == "base":
             self.policy, self.policy_config = load_base_policy(
-                assets, device=run_config.device
+                assets,
+                device=run_config.device,
+                profile=profile,
             )
             identifier = "lerobot/smolvla_base"
             revision = run_config.model_revision
             model_sha256 = run_config.model_sha256
         elif policy_kind == "peft_adapter" and adapter_dir is not None:
             self.policy, self.policy_config = load_adapter_policy(
-                assets, adapter_dir, device=run_config.device
+                assets,
+                adapter_dir,
+                device=run_config.device,
+                profile=profile,
             )
             identifier = "embodiedai/franka-pick-place-smolvla-lora"
             revision = adapter_dir.name

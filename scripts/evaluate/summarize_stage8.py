@@ -82,12 +82,12 @@ def _markdown(report: dict[str, object]) -> str:
     lines.extend(
         [
             "", "## Acceptance", "",
-            "The matrix and artifact-integrity checks completed. The scripted expert passed; "
-            "both learned policies failed the reviewed hard-action safety gate and must not be "
-            "used as a Stage 9 baseline without a separate review.",
+            "The complete matrix and artifact-integrity checks passed. Policy acceptance "
+            "below is derived from the recorded outcomes; any learned-policy error keeps that "
+            "policy out of Stage 9 until separately reviewed.",
             "", "## Baseline comparison", "",
-            "The scripted expert is the task sanity baseline. Base and Step 6A PEFT are "
-            "compared on the identical five scenarios and three policy-noise seeds.", "",
+            "The scripted expert is the task sanity baseline. Base and PEFT are compared on "
+            f"the identical {report['scenario_count']} scenarios and three policy-noise seeds.", "",
             f"- Base success-rate delta vs expert: {base_expert:+.3f}",
             f"- PEFT success-rate delta vs expert: {peft_expert:+.3f}",
             f"- PEFT success-rate delta vs base: {peft_base:+.3f}",
@@ -109,7 +109,10 @@ def main() -> None:
     config = Stage8RunConfig.from_toml(
         args.config, repository_root=repository, data_root=data_root
     )
-    scenarios = load_scenarios(config.scenarios_path)
+    scenarios = load_scenarios(
+        config.scenarios_path,
+        expected_count=config.expected_scenario_count,
+    )
     expected = {
         (scenario.scenario_id, seed)
         for scenario in scenarios
@@ -130,6 +133,14 @@ def main() -> None:
             raise FileNotFoundError(f"policy identity artifact is missing: {identity_path}")
         policy_identities[kind] = json.loads(identity_path.read_text(encoding="utf-8"))
 
+    def acceptance(kind: str) -> str:
+        outcome_counts = policies[kind]["outcome_counts"]
+        if int(outcome_counts.get("error", 0)) > 0:
+            return "failed_safety_or_runtime"
+        if kind == "scripted_expert" and float(policies[kind]["success_rate"]) < 1.0:
+            return "failed_task_sanity"
+        return "passed_evaluation"
+
     def compare(left: str, right: str) -> dict[str, float]:
         return {
             "success_rate_delta": float(policies[left]["success_rate"])
@@ -143,6 +154,7 @@ def main() -> None:
         "schema_version": "embodied-ai.stage8-comparison/v1",
         "status": "completed",
         "run_id": config.run_id,
+        "scenario_count": len(scenarios),
         "expected_rollouts_per_policy": len(expected),
         "scheduler": {"prediction_horizon": 50, "execute_horizon": 5},
         "configuration": {
@@ -154,9 +166,8 @@ def main() -> None:
         "policy_identities": policy_identities,
         "policies": policies,
         "policy_acceptance": {
-            "scripted_expert": "passed",
-            "base": "failed_safety",
-            "peft_adapter": "failed_safety",
+            kind: acceptance(kind)
+            for kind in ("scripted_expert", "base", "peft_adapter")
         },
         "comparisons": {
             "base_vs_expert": compare("base", "scripted_expert"),

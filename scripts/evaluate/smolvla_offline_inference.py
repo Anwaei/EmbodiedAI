@@ -4,7 +4,6 @@
 from __future__ import annotations
 
 import argparse
-import json
 import os
 import shutil
 import subprocess
@@ -27,6 +26,7 @@ from embodied_ai.policies.smolvla.processing import (
     load_project_processors,
     sha256_file,
 )
+from embodied_ai.policies.smolvla.profile import franka_pick_place_smolvla_profile
 from embodied_ai.policies.smolvla.runtime import (
     LocalSmolVLAAssets,
     load_adapter_policy,
@@ -56,6 +56,12 @@ def _parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--adapter_dir", type=Path)
     parser.add_argument("--baseline_report", type=Path)
+    parser.add_argument(
+        "--split_subset",
+        choices=("validation", "test"),
+        default="validation",
+        help="Frozen split partition used for deterministic offline anchors.",
+    )
     parser.add_argument(
         "--output_dir",
         type=Path,
@@ -137,8 +143,9 @@ def main() -> None:
 
     run_config = Stage7RunConfig.from_toml(args.config, repository_root=repository)
     split = Stage7EpisodeSplit.from_json(run_config.split_path)
-    dataset_root, _ = validate_dataset_and_split(run_config, split)
-    processors = load_project_processors(processor_dir)
+    profile = franka_pick_place_smolvla_profile(run_config.dataset_repo_id)
+    dataset_root, _ = validate_dataset_and_split(run_config, split, profile=profile)
+    processors = load_project_processors(processor_dir, profile=profile)
     if processors.statistics_scope != "train_split":
         raise ValueError("Step 5/6A offline inference requires training-split statistics")
     processor_manifest = load_json_object(processor_dir / PROCESSOR_MANIFEST_NAME)
@@ -152,7 +159,11 @@ def main() -> None:
     asset_identity = assets.verify()
     adapter_dir = None
     if args.adapter_dir is None:
-        policy, policy_config = load_base_policy(assets, device=run_config.device)
+        policy, policy_config = load_base_policy(
+            assets,
+            device=run_config.device,
+            profile=profile,
+        )
         policy_kind = "base"
     else:
         adapter_dir = _under(args.adapter_dir, checkpoints_root, "--adapter_dir")
@@ -160,11 +171,19 @@ def main() -> None:
             assets,
             adapter_dir,
             device=run_config.device,
+            profile=profile,
         )
         policy_kind = "peft_adapter"
 
-    dataset = open_dataset(run_config)
-    anchors = offline_anchors(dataset, split.validation_episode_indices)
+    dataset = open_dataset(run_config, profile=profile)
+    episode_indices = (
+        split.validation_episode_indices
+        if args.split_subset == "validation"
+        else split.test_episode_indices
+    )
+    if not episode_indices:
+        raise ValueError(f"the reviewed split has no {args.split_subset} partition")
+    anchors = offline_anchors(dataset, episode_indices)
     result = run_offline_inference(
         policy,
         policy_config,
@@ -189,9 +208,7 @@ def main() -> None:
     if repeat_max_abs_error > 1e-6:
         raise RuntimeError(f"offline inference is not repeatable: {repeat_max_abs_error}")
 
-    validation_report = (
-        runs_root / "stage7-validation/stage7-franka-pick-place-batch-v1.json"
-    )
+    validation_report = runs_root / f"stage7-validation/{run_config.dataset_root_name}.json"
     if not validation_report.is_file():
         raise FileNotFoundError(f"Stage 7 validation report is missing: {validation_report}")
     report: dict[str, object] = {
@@ -200,7 +217,8 @@ def main() -> None:
         "policy_kind": policy_kind,
         "adapter_dir": None if adapter_dir is None else adapter_dir.as_posix(),
         "dataset_root": dataset_root.as_posix(),
-        "validation_episode_indices": list(split.validation_episode_indices),
+        "split_subset": args.split_subset,
+        "episode_indices": list(episode_indices),
         "anchors": [record for record in result.records],
         "metrics": result.metrics,
         "repeatability_max_abs_error": repeat_max_abs_error,

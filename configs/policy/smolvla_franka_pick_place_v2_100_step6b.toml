@@ -1,0 +1,44 @@
+schema_version = "embodied-ai.smolvla-run-config/v1"
+seed = 20260830
+device = "cuda"
+
+[dataset]
+root_name = "stage7-franka-pick-place-batch-v2-100"
+repo_id = "embodiedai/franka-pick-place-stage7-batch-v2-100"
+mapping_profile = "franka-pick-place-smolvla-v1"
+split_path = "configs/policy/smolvla_stage7_split_v2_100.json"
+video_backend = "pyav"
+
+[model]
+revision = "c83c3163b8ca9b7e67c509fffd9121e66cb96205"
+sha256 = "7cd549ac2351fb069c0ddb3c34ad2d09cfc92b56a15dccdfc2e41467aaca01eb"
+vlm_revision = "7b375e1b73b11138ff12fe22c8f2822d8fe03467"
+
+[processor]
+statistics_scope = "train_split"
+chunk_size = 50
+tokenizer_max_length = 48
+
+[offline_inference]
+anchor_positions = ["first", "middle", "last"]
+noise_seed = 20260830
+warmup_samples = 1
+
+[peft]
+method = "lora"
+rank = 8
+alpha = 16
+dropout = 0.05
+learning_rate = 0.0001
+weight_decay = 0.0000000001
+batch_size = 16
+gradient_accumulation_steps = 1
+micro_overfit_steps = 3
+max_optimizer_steps = 50
+gradient_clip_norm = 10.0
+log_every_steps = 50
+
+[formal_peft]
+epochs = 5
+validation_every_epochs = 1
+keep_every_epoch_adapter = true

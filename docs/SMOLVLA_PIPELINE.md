@@ -1,6 +1,6 @@
 # SmolVLA Offline Pipeline
 
-Status: **Steps 4, 5, and 6A completed on 2026-08-30; expanded data converted and validated; Step 6B awaits split and run-config review**
+Status: **Steps 4-6B completed; formal five-epoch Step 6B run and held-out evaluation passed on 2026-08-31**
 
 This document defines the design and execution record for the VLA-only portion of Stage 7. It starts
 from the validated local `LeRobotDataset` produced by steps 1-3 and ends with reviewed offline
@@ -279,6 +279,29 @@ provenance; reproducible held-out offline metrics; and a documented configuratio
 Stage 8 closed-loop evaluation. Formal offline improvement does not itself establish simulator
 task success.
 
+## Step 6B implementation record — 2026-08-31
+
+`configs/policy/smolvla_stage7_split_v2_100.json` freezes an 80/10/10 whole-episode split. Each
+validation and test partition contains all 10 cube resets, all 10 goals, and exactly two examples
+of each instruction; training contains eight examples of every reset/goal and 16 of every
+instruction. Source episode identities and conversion provenance are hash-checked, and the formal
+balance is enforced in code.
+
+Training-only processors were published under
+`$EMBODIEDAI_ARTIFACTS/stage7/processors/franka-pick-place-smolvla-v2-100-train80-v1`. The formal
+rank-8/alpha-16 LoRA run used batch size 16, five epochs, 536 optimizer steps per epoch, and 2,680
+steps total. It trained 371,328 of 450,417,504 parameters in 2,037.8 seconds. Fixed validation
+flow-matching loss decreased monotonically from 3.6908 before training to 0.6298, 0.4873, 0.4011,
+0.3580, and 0.3259 after epochs 1-5. Peak allocated/reserved CUDA memory was about 3.13/3.25 GiB.
+All epoch adapters are retained; epoch 5 is selected and published at
+`$EMBODIEDAI_CHECKPOINTS/stage7-step6b/smolvla-lora-r8-100ep-5epochs-v1`.
+
+Clean-process offline reload was exactly repeatable. On validation anchors, base versus Step 6B
+MAE/RMSE was 0.5103/0.7100 versus 0.2691/0.5168. On the untouched test anchors it was
+0.5212/0.7158 versus 0.2974/0.5498, and gripper-sign agreement improved from 0.3333 to 0.6667.
+The formal adapter still produced an 8.10% test bound-violation rate and therefore remained subject
+to the unchanged Stage 8 hard-action gate.
+
 ## Implementation record — 2026-08-30
 
 The implementation is configuration-driven and VLA-only:
@@ -321,14 +344,13 @@ probe exactly. Adapter MAE/RMSE were `0.505373`/`0.694298`, slightly worse than 
 baseline, so the checkpoint proves training/save/reload mechanics only and is not promoted as an
 improved policy.
 
-## Remaining approval sequence
+## Handoff
 
-Steps 4, 5, and 6A have passed their approved execution, and the expanded raw Contract corpus has
-now repeated Stage 7 steps 1-3 successfully. Review and freeze the expanded whole-episode split,
-training-only statistics, and formal run configuration before separately approving Step 6B.
-Stage 8 small-corpus closed-loop evaluation was separately approved on 2026-08-31. It reuses these
-processor/base/Step 6A artifacts through a loopback Robot Client + Policy Server boundary with
-receding-horizon `execute_horizon = 5`; it does not alter this offline pipeline.
+Steps 4-6B have passed their approved execution. Stage 8 reused the selected Step 6B adapter through
+the loopback Robot Client + Policy Server boundary with receding-horizon `execute_horizon = 5`.
+Offline improvement did not yield closed-loop success: all Step 6B rollouts were rejected by the
+unchanged hard-action gate. Any action-distribution or safety-policy change requires a new reviewed
+experiment rather than mutation of these frozen reports.
 
 No step implicitly authorizes package installation, lock modification, model download, dataset
 mutation, or Isaac execution.

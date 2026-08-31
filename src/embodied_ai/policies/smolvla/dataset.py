@@ -8,7 +8,11 @@ from typing import Any
 
 from .config import Stage7RunConfig
 from .processing import load_json_object
-from .profile import FRANKA_PICK_PLACE_SMOLVLA_PROFILE, SmolVLAProjectProfile
+from .profile import (
+    FRANKA_PICK_PLACE_SMOLVLA_PROFILE,
+    SmolVLAProjectProfile,
+    franka_pick_place_smolvla_profile,
+)
 from .split import Stage7EpisodeSplit
 
 CONVERSION_MANIFEST_RELATIVE_PATH = Path("meta/embodied_ai_conversion.json")
@@ -50,8 +54,9 @@ def validate_dataset_and_split(
     config: Stage7RunConfig,
     split: Stage7EpisodeSplit,
     *,
-    profile: SmolVLAProjectProfile = FRANKA_PICK_PLACE_SMOLVLA_PROFILE,
+    profile: SmolVLAProjectProfile | None = None,
 ) -> tuple[Path, dict[str, Any]]:
+    profile = profile or franka_pick_place_smolvla_profile(config.dataset_repo_id)
     root = resolve_dataset_root(config)
     if split.dataset_repo_id != config.dataset_repo_id:
         raise ValueError("split and run config dataset repo_id differ")
@@ -61,6 +66,7 @@ def validate_dataset_and_split(
         raise ValueError("split, run config, and project mapping profiles differ")
     manifest = load_json_object(root / CONVERSION_MANIFEST_RELATIVE_PATH)
     split.validate_conversion_manifest(manifest)
+    split.validate_formal_balance(manifest)
     return root, manifest
 
 
@@ -70,13 +76,14 @@ def open_dataset(
     episodes: tuple[int, ...] | None = None,
     policy_config: Any | None = None,
     action_horizon: bool = False,
-    profile: SmolVLAProjectProfile = FRANKA_PICK_PLACE_SMOLVLA_PROFILE,
+    profile: SmolVLAProjectProfile | None = None,
 ) -> Any:
     from lerobot.datasets.dataset_metadata import LeRobotDatasetMetadata
     from lerobot.datasets.factory import resolve_delta_timestamps
     from lerobot.datasets.lerobot_dataset import LeRobotDataset
 
     root = resolve_dataset_root(config)
+    profile = profile or franka_pick_place_smolvla_profile(config.dataset_repo_id)
     delta_timestamps = None
     if action_horizon:
         if policy_config is None:

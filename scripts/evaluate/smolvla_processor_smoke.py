@@ -24,7 +24,7 @@ from embodied_ai.policies.smolvla.processing import (
     load_project_processors,
     sha256_file,
 )
-from embodied_ai.policies.smolvla.profile import FRANKA_PICK_PLACE_SMOLVLA_PROFILE
+from embodied_ai.policies.smolvla.profile import franka_pick_place_smolvla_profile
 from embodied_ai.policies.smolvla.runtime import LocalSmolVLAAssets, runtime_identity
 from embodied_ai.policies.smolvla.split import Stage7EpisodeSplit
 
@@ -94,9 +94,13 @@ def main() -> None:
     dataset_root, _ = validate_dataset_and_split(run_config, split)
     assets = LocalSmolVLAAssets.from_run_config(run_config)
     asset_identity = assets.verify()
-    profile = FRANKA_PICK_PLACE_SMOLVLA_PROFILE
+    profile = franka_pick_place_smolvla_profile(run_config.dataset_repo_id)
 
-    train_dataset = open_dataset(run_config, episodes=split.train_episode_indices)
+    train_dataset = open_dataset(
+        run_config,
+        episodes=split.train_episode_indices,
+        profile=profile,
+    )
     statistics = compute_policy_statistics(train_dataset, profile)
     expected_train_frames = sum(
         int(row["length"])
@@ -119,7 +123,7 @@ def main() -> None:
         profile=profile,
     )
 
-    full_dataset = open_dataset(run_config)
+    full_dataset = open_dataset(run_config, profile=profile)
     raw_sample = full_dataset[0]
     inference = policy_input_from_sample(raw_sample, profile)
     processed_inference = processors.preprocess_inference(inference)
@@ -129,6 +133,7 @@ def main() -> None:
         episodes=split.train_episode_indices,
         policy_config=policy_config,
         action_horizon=True,
+        profile=profile,
     )
     training_batch = next(iter(torch.utils.data.DataLoader(horizon_dataset, batch_size=1)))
     processed_training = processors.preprocess_training(training_batch)
@@ -146,7 +151,10 @@ def main() -> None:
         (reconstructed - expected_action).abs().max().item()
     )
     if maximum_roundtrip_error > 1e-6:
-        raise RuntimeError(f"action processor round trip exceeded tolerance: {maximum_roundtrip_error}")
+        raise RuntimeError(
+            "action processor round trip exceeded tolerance: "
+            f"{maximum_roundtrip_error}"
+        )
 
     provenance = {
         "repository_revision": _git_revision(repository),

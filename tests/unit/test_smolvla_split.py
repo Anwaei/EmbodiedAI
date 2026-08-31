@@ -4,12 +4,15 @@ import json
 import unittest
 from pathlib import Path
 
-from embodied_ai.policies.smolvla.config import Stage7RunConfig
+from embodied_ai.policies.smolvla.config import Stage7RunConfig, Stage7Step6BConfig
 from embodied_ai.policies.smolvla.split import Stage7EpisodeSplit
-
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 RUN_CONFIG_PATH = REPOSITORY_ROOT / "configs/policy/smolvla_franka_pick_place_v1.toml"
+FORMAL_CONFIG_PATH = (
+    REPOSITORY_ROOT
+    / "configs/policy/smolvla_franka_pick_place_v2_100_step6b.toml"
+)
 
 
 class Stage7SplitTest(unittest.TestCase):
@@ -41,6 +44,25 @@ class Stage7SplitTest(unittest.TestCase):
                 Stage7EpisodeSplit.from_json(temporary)
         finally:
             temporary.unlink(missing_ok=True)
+
+    def test_formal_split_is_complete_and_disjoint(self) -> None:
+        formal = Stage7Step6BConfig.from_toml(
+            FORMAL_CONFIG_PATH,
+            repository_root=REPOSITORY_ROOT,
+        )
+        split = Stage7EpisodeSplit.from_json(formal.run.split_path)
+
+        self.assertEqual(formal.epochs, 5)
+        self.assertEqual(len(split.train_episode_indices), 80)
+        self.assertEqual(len(split.validation_episode_indices), 10)
+        self.assertEqual(len(split.test_episode_indices), 10)
+        combined = (
+            split.train_episode_indices
+            + split.validation_episode_indices
+            + split.test_episode_indices
+        )
+        self.assertEqual(set(combined), set(range(100)))
+        self.assertEqual(len(combined), len(set(combined)))
 
 
 if __name__ == "__main__":

@@ -28,6 +28,7 @@ class Stage8RunConfig:
     hard_action_limit: float
     scenarios_path: Path
     noise_seeds: tuple[int, ...]
+    expected_scenario_count: int
     record_video: bool
     stage7_config_path: Path
     processor_dir: Path
@@ -68,6 +69,7 @@ class Stage8RunConfig:
             hard_action_limit=float(safety["hard_action_limit"]),
             scenarios_path=(repository_root / evaluation["scenarios_path"]).resolve(),
             noise_seeds=tuple(int(seed) for seed in evaluation["policy_noise_seeds"]),
+            expected_scenario_count=int(evaluation.get("expected_scenario_count", 5)),
             record_video=bool(evaluation["record_video"]),
             stage7_config_path=(repository_root / artifacts["stage7_run_config"]).resolve(),
             processor_dir=(data_root / artifacts["processor_dir"]).resolve(),
@@ -88,15 +90,26 @@ class Stage8RunConfig:
             raise ValueError("reviewed Stage 8 safety envelope changed")
         if len(self.noise_seeds) != 3 or len(set(self.noise_seeds)) != 3:
             raise ValueError("Stage 8 requires exactly three distinct noise seeds")
+        if self.expected_scenario_count not in (5, 10):
+            raise ValueError("reviewed Stage 8 suites contain either five or ten scenarios")
 
 
-def load_scenarios(path: Path) -> tuple[EvaluationScenario, ...]:
+def load_scenarios(
+    path: Path,
+    *,
+    expected_count: int = 5,
+) -> tuple[EvaluationScenario, ...]:
     source = json.loads(path.read_text(encoding="utf-8"))
     if source.get("schema_version") != STAGE8_SCENARIOS_SCHEMA_VERSION:
         raise ValueError("unsupported Stage 8 scenarios schema")
     scenarios = tuple(EvaluationScenario.from_dict(item) for item in source["scenarios"])
-    if len(scenarios) != 5 or len({item.scenario_id for item in scenarios}) != 5:
-        raise ValueError("reviewed Stage 8 suite requires five unique scenarios")
+    if (
+        len(scenarios) != expected_count
+        or len({item.scenario_id for item in scenarios}) != expected_count
+    ):
+        raise ValueError(
+            f"reviewed Stage 8 suite requires {expected_count} unique scenarios"
+        )
     return scenarios
 
 

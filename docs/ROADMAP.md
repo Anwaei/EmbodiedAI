@@ -11,8 +11,8 @@
 | 4 | Install and validate Isaac environment | Completed 2026-08-20; see `ENVIRONMENT.md` |
 | 5 | Install and validate VLA environment | Completed 2026-08-21; see `ENVIRONMENT.md` |
 | 6 | Isaac Demonstration Pipeline | Completed; 20-episode baseline and 100-episode expanded corpus validated |
-| 7 | LeRobot + VLA Training Pipeline | In progress; steps 1-5 and 6A complete; expanded 6B dataset converted/validated, split review pending |
-| 8 | Closed-loop Policy Evaluation | Approved 2026-08-31; Robot Client + Policy Server implementation pending |
+| 7 | LeRobot + VLA Training Pipeline | Completed through Step 6B on 2026-08-31 |
+| 8 | Closed-loop Policy Evaluation | Completed for small and expanded-corpus matrices on 2026-08-31 |
 | 9 | RL Policy Refinement | Not approved |
 | 10 | ROS 2 deployment boundary | Not approved |
 | 11 | Reproducibility and robustness gate | Not approved |
@@ -105,41 +105,47 @@ pipeline.
    predictions, finite/bounds checks, action metrics, latency, memory, and complete provenance.
    The accepted 15-anchor held-out baseline is finite and exactly repeatable; its normalized-action
    MAE/RMSE are 0.4986/0.6787. This step does not run Isaac and cannot claim closed-loop task success.
-6. Develop fine-tuning in two reviewed substeps. **Step 6A completed; Step 6B not started.** Step 6A uses a
+6. Develop fine-tuning in two reviewed substeps. **Completed.** Step 6A uses a
    deterministic episode-level split of the existing 20 episodes and a bounded LoRA/PEFT job to
    prove train/validate/save/reload mechanics. The accepted rank-2 run trains 92,832 parameters for
    50 optimizer steps, lowers held-out flow-matching loss from 5.8073 to 3.8950, saves an adapter,
    and reloads it in a clean process. Its offline MAE of 0.5054 is slightly worse than the base, so
-   it establishes technical feasibility only. Step 6B begins only after a larger corpus has passed
-   steps 1-3 again, then performs formal PEFT development with frozen train/validation/test splits,
-   training-only statistics, checkpoint selection, and held-out offline evaluation. Full-parameter
-   fine-tuning remains separately gated. The larger corpus has now passed steps 1-3; Step 6B next
-   requires review of its frozen episode-level split, training-only statistics, and formal run
-   configuration before training begins.
+   it establishes technical feasibility only. Step 6B freezes a spatially and linguistically
+   balanced 80/10/10 whole-episode split of the 100-episode corpus, recomputes statistics from the
+   80 training episodes, and trains a rank-8 LoRA adapter for exactly five epochs (2,680 optimizer
+   steps). The selected epoch-5 checkpoint reduced fixed validation flow-matching loss from 3.6908
+   to 0.3259. On the untouched test anchors, action MAE/RMSE improved from the base
+   0.5212/0.7158 to 0.2974/0.5498, while the 8.10% bound-violation rate remained a mandatory
+   closed-loop safety concern. Full-parameter fine-tuning remains separately gated.
 
 Exit gate: a reproducible LeRobot dataset and reviewed SmolVLA adapter/checkpoint pass offline
 validation in the isolated VLA environment.
 
 ## Stage 8 — Closed-loop Policy Evaluation
 
-Stage 8 was approved on 2026-08-31 for the existing small-corpus base/Step 6A artifacts. It uses a
+Stage 8 was completed on 2026-08-31 for both the small-corpus baseline and the formal Step 6B
+adapter. It uses a
 loopback HTTP/JSON Robot Client + Policy Server boundary, not ROS 2. The accepted action scheduler
 uses a 50-step SmolVLA prediction with receding-horizon `execute_horizon = 5`.
 
-1. Define versioned RPC, policy identity, scenario, and rollout contracts.
+1. Define versioned RPC, policy identity, scenario, and rollout contracts. **Completed.**
 2. Implement a VLA-only Policy Server that reuses the Stage 7 processor and loads one pinned base
-   or PEFT adapter per process.
+   or PEFT adapter per process. **Completed.**
 3. Implement a one-environment Isaac Robot Client, five-action receding-horizon scheduler, online
-   action safety, timeout handling, and public task evaluation.
+   action safety, timeout handling, and public task evaluation. **Completed.**
 4. Validate protocol, malformed responses, timeout, reset/queue semantics, and dependency
-   boundaries with a fake server before GPU integration.
+   boundaries with a fake server before GPU integration. **Completed.**
 5. Run a single real two-process base-policy closed-loop smoke and atomically record its artifacts.
-6. Run the five held-out small-corpus scenarios with three fixed seeds per learned policy and
-   record task/action/latency/rollout metrics.
-7. Compare the scripted state-machine reference, unfine-tuned SmolVLA base, and Step 6A adapter on
-   the same 45-rollout matrix.
-8. Publish a reproducible JSON/human-readable report and handoff. Step 6B adapters can later be
-   added without changing the protocol or Robot Client.
+   **Completed.**
+6. Run held-out scenarios with three fixed seeds per learned policy and record task/action/latency/
+   rollout metrics. **Completed** for both five-scenario small-corpus and ten-scenario expanded-test
+   suites.
+7. Compare the scripted state-machine reference, unfine-tuned SmolVLA base, and PEFT adapter on
+   identical matrices. **Completed.** The expanded matrix contains 30 rollouts per policy: expert
+   30/30 success, base 0/30, and Step 6B 0/30. Both learned policies failed closed on the reviewed
+   hard-action limit; no unsafe chunk was executed.
+8. Publish a reproducible JSON/human-readable report and handoff. **Completed.** The expanded
+   report is under `$EMBODIEDAI_RUNS/stage8/stage8-expanded-corpus-step6b-v1/reports`.
 
 Detailed design and gates are in `docs/STAGE8_EVALUATION.md`.
 
