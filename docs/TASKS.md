@@ -488,3 +488,37 @@ Step 6A comparison; final reproducibility report. Outputs remain below
 `$EMBODIEDAI_RUNS/stage8`, never below the training dataset root. Exact commands and accepted
 artifacts will be recorded here after implementation. See `docs/STAGE8_EVALUATION.md` for the
 reviewed message fields, safety policy, metrics, matrix, and gates.
+
+## Stage 9 steps 9.1-9.2: standalone PPO task foundation
+
+Status: **implemented and GPU-validated on 2026-08-31; PPO optimization has not started**.
+
+The standalone state-policy task is registered separately as
+`EmbodiedAI-Franka-PickPlace-State-PPO-v0`. It reuses the existing Franka, table, cube, relative
+IK action, 20 Hz control rate, workspace failure bounds, and public placement success semantics.
+It does not change `EmbodiedAI-Franka-PickPlace-RGB-v0`, demonstration collection, or Stage 8.
+
+Its actor and critic receive one concatenated 52D tensor containing joint position/velocity,
+tool-center pose, privileged cube state, per-environment goal, relative vectors, previous action,
+and a monotonic five-phase one-hot value. RGB and language are absent. The action remains the
+canonical normalized 6D end-effector delta plus one binary gripper command.
+
+Each reset independently samples cube and goal positions from the reviewed TOML ranges. A movable,
+non-colliding goal marker follows the semantic goal. Separate left/right finger sensors measure
+cube-filtered normal contact. Reward terms are reach, grasp, lift, place, terminal success,
+action magnitude, action rate, and gripper toggling. Termination diagnostics distinguish success,
+workspace failure, invalid state, and timeout.
+
+Run the bounded task-layer validation from the Isaac environment:
+
+```bash
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src "$EMBODIEDAI_ENVS/isaac/bin/python" \
+  scripts/sim/franka_pick_place_ppo_task_smoke.py \
+  --headless --device cuda:0 --num_envs 4 --steps 2 --seed 20260901
+```
+
+The accepted smoke reported `STAGE9_PPO_TASK_OK`, observation shape `(4, 52)`, action shape
+`(4, 7)`, finite rewards, independently sampled non-terminal resets, and matching installed
+`rsl-rl-lib 3.1.2`. It created no checkpoint or training artifact. Step 9.3 will add the first
+bounded PPO optimize/save/reload/resume smoke.

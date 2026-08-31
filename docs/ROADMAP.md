@@ -13,7 +13,7 @@
 | 6 | Isaac Demonstration Pipeline | Completed; 20-episode baseline and 100-episode expanded corpus validated |
 | 7 | LeRobot + VLA Training Pipeline | Completed through Step 6B on 2026-08-31 |
 | 8 | Closed-loop Policy Evaluation | Completed for small and expanded-corpus matrices on 2026-08-31 |
-| 9 | RL Policy Refinement | Not approved |
+| 9 | RL Policy Refinement | Steps 9.1-9.2 completed 2026-08-31; training not started |
 | 10 | ROS 2 deployment boundary | Not approved |
 | 11 | Reproducibility and robustness gate | Not approved |
 
@@ -24,7 +24,7 @@
 3. Versioned dataset export and validation in LeRobot format.
 4. SmolVLA inference, then bounded LoRA/PEFT fine-tuning.
 5. Closed-loop policy evaluation in simulation.
-6. Optional PPO/SAC residual action refinement after the imitation baseline works.
+6. State-based PPO baseline followed by optional bounded PPO residual action refinement.
 7. ROS 2 Humble deployment interface through the Isaac Sim bridge.
 8. Domain-randomization robustness report covering visual, camera, object, physics, and
    action/sensor perturbations.
@@ -154,16 +154,42 @@ comparison report.
 
 ## Stage 9 — RL Policy Refinement
 
-1. Define reviewed PPO / SAC training interfaces, observations, actions, rewards, termination
-   semantics, and reproducible simulation evaluation.
-2. Establish standalone PPO/SAC baselines before combining learned controllers.
-3. Implement an optional residual policy of the form
-   `bounded_action = clamp(vla_action + rl_residual)` with explicit scale and safety limits.
-4. Compare residual refinement against the Stage 8 VLA and scripted baselines; retain it only if
-   it improves reviewed metrics without violating the action contract.
+The first implementation has two modes: a privileged state-based standalone PPO baseline and a
+bounded 6D PPO residual around a frozen FT-VLA nominal action. SAC remains deferred until these
+two PPO paths are understood. RGB and language are excluded from both PPO actors; the residual
+path still uses them inside the separate frozen VLA Policy Server.
 
-Exit gate: PPO/SAC and residual-policy results are reproducible, contract-compatible, and compared
-against the closed-loop imitation baselines.
+1. **Step 9.1 — RL contracts/config/backend. Completed.** Freeze versioned observation, action composer,
+   reward, scenario split, checkpoint, and run-manifest definitions; use the already locked RSL-RL
+   PPO backend.
+2. **Step 9.2 — Shared Isaac RL task layer. Completed.** Add vectorized low-dimensional state extraction,
+   phase estimation, staged rewards, training resets, and compatible termination diagnostics
+   without changing Stage 6 or Stage 8 behavior.
+3. **Step 9.3 — Standalone PPO integration smoke.** Run one-environment and small-vectorized
+   optimize/save/reload/resume paths with the normalized 7D end-effector/gripper action.
+4. **Step 9.4 — Standalone PPO baseline training.** Train on a committed geometry distribution
+   and select checkpoints on held-out success and return across fixed seeds.
+5. **Step 9.5 — Residual contracts/composer.** Implement a nominal-policy provider and
+   `clip(clip(a_vla) + alpha * clip(a_rl))`; PPO controls only six arm dimensions and the nominal
+   VLA retains the gripper channel.
+6. **Step 9.6 — Batched nominal VLA path.** Extend the Stage 8 process boundary with batched
+   requests and independent per-environment receding-horizon queues; measure latency, VRAM,
+   saturation, and queue age.
+7. **Step 9.7 — Residual PPO integration smoke.** Prove the framework against a deterministic
+   fake nominal policy, then a bounded real FT-VLA single-/small-vectorized pilot.
+8. **Step 9.8 — FT-VLA + PPO training.** Proceed only after reviewed nominal-action, gripper,
+   throughput, memory, and reset-isolation gates.
+9. **Step 9.9 — Five-policy comparison.** Compare expert, base SmolVLA, standalone PPO, FT-VLA,
+   and FT-VLA+PPO on identical frozen scenarios/seeds and one Stage 9 safety profile.
+10. **Step 9.10 — Reproducibility handoff.** Publish configurations, checkpoint/model identities,
+    curves, resource measurements, paired metrics, failure examples, and limitations.
+
+Detailed observations, reward definitions, residual algebra, feasibility risks, and per-step exit
+gates are in `docs/STAGE9_RL.md`.
+
+Exit gate: standalone PPO and the bounded residual framework run reproducibly end to end and remain
+contract-compatible. Residual effectiveness is a separate result and may be claimed only if the
+paired evaluation improves the reviewed primary metric without worse safety.
 
 ## Stage 10 — ROS 2 Deployment Boundary
 

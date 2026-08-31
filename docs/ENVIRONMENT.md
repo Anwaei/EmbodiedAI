@@ -1,7 +1,7 @@
 # Environment and Bootstrap Plan
 
-Status: **Stages 1-6 completed; Stage 7 steps 1-5 and 6A completed; Step 6B split review pending; Stage 8 approved; Stages 9-11 not approved**
-Audit date: 2026-08-17 (hardware); expanded Stage 7 steps 1-3 validation updated 2026-08-30
+Status: **Stages 1-8 completed; Stage 9 Steps 9.1-9.2 implemented; Stages 10-11 not approved**
+Audit date: 2026-08-17 (hardware); Stage 9 design status updated 2026-08-31
 Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
 
 ## 1. Constraints and decision summary
@@ -14,7 +14,7 @@ Target host: `embodied-5090` / `/root/projects/EmbodiedAI`
   - LeRobot `v0.6.0` with the `smolvla` feature set, Python `3.12`, PyTorch `2.8.0+cu128`, TorchCodec `0.7.x`, NumPy `2.2.x`.
   - ROS 2 Humble on Ubuntu 22.04 using its native Python `3.10`, communicating with Isaac Sim through DDS and the Isaac Sim ROS 2 bridge.
 - The restarted container now passes the static hardware/resource preflight: one usable RTX 5090, a 25-CPU cgroup quota, 90 GiB RAM, 45 GiB shared memory, and 550 GiB on the data disk. The 30 GiB root filesystem remains intentionally code-only.
-- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 established the contracts, task skeleton, deterministic reset/evaluation, immutable episode path, instruction-bearing state-machine expert, and validated 20- and 100-episode corpora. Stage 7 steps 1-5 and 6A are complete; Stages 8-11 remain separate and unauthorized.
+- Stage 0 was approved. Repository/bootstrap and initial lock-only work in Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were subsequently approved and completed in GPU-mode allocations. Stage 6 established the contracts, task skeleton, deterministic reset/evaluation, immutable episode path, instruction-bearing state-machine expert, and validated 20- and 100-episode corpora. Stage 7 completed the LeRobot/SmolVLA pipeline through formal Step 6B training, and Stage 8 completed the reviewed closed-loop matrices. Stage 9 Steps 9.1-9.2 now provide the reviewed PPO contracts/configuration and shared Isaac RL task layer. No PPO optimization or residual-policy implementation has started. Stages 10-11 remain separate and unauthorized.
 - Stage 2/3 execution occurred while the leased server was in no-GPU mode; this was acceptable for lock-only work and no GPU test was attempted. The GPU-mode hardware audit above remains the acceptance baseline for the later runtime stages.
 
 ## 2. Remote-machine audit
@@ -178,7 +178,12 @@ Isaac Sim 6.0/6.0.1 and Isaac Lab 3.0 beta/develop are not selected for the MVP.
 
 ## 6. Staged bootstrap plan
 
-Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode. Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were then separately approved and completed. Stage 6 has published validated 20- and 100-episode corpora. Stage 7 steps 1-5 and 6A are complete, and steps 1-3 have also been repeated against the expanded corpus; Step 6B remains gated on split/statistics/training-config review, and Stages 8-11 remain unauthorized.
+Stage 1's read-only hardware audit was completed after the user restarted the server in GPU mode.
+Stage 0 was subsequently approved, and Stages 2-3 completed on 2026-08-20. Stages 4 and 5 were
+then separately approved and completed. Stage 6 published validated 20- and 100-episode corpora;
+Stage 7 completed through formal Step 6B training; and Stage 8 completed its small- and
+expanded-corpus closed-loop matrices. Stage 9 has a proposed design only. No RL implementation or
+dependency change has started, and Stages 10-11 remain unauthorized.
 
 ### GPU-mode execution policy for Stages 4 and 5
 
@@ -515,15 +520,27 @@ baseline comparison.
 
 ### Stage 9 — RL Policy Refinement
 
-- Define reviewed PPO / SAC observations, actions, rewards, termination semantics, training
-  configuration, and simulation evaluation.
-- Establish standalone PPO/SAC baselines before combining learned controllers.
-- Add an optional bounded residual policy around the Stage 8 VLA action with explicit residual
-  scale, clipping, and safety limits.
-- Compare PPO/SAC and residual results against the closed-loop scripted and imitation baselines.
+- The first implementation uses the RSL-RL PPO backend already present in the reviewed Isaac lock;
+  no dependency or environment change is proposed. SAC is deferred.
+- Steps 9.1-9.2 are complete without package changes. The locked backend identity is
+  `rsl-rl-lib 3.1.2` through `isaaclab-rl 0.4.7`; a four-environment RTX 5090 task smoke validated
+  the 52D observation, 7D action, randomized reset, reward managers, and termination managers.
+- Build a privileged state-only standalone PPO baseline with the existing normalized 7D
+  end-effector-delta plus binary-gripper action boundary.
+- Build a frozen-FT-VLA residual PPO whose actor sees compact non-visual state plus the current
+  nominal action and emits only a bounded 6D arm correction. Clip the nominal action before
+  composition and the final arm action after composition; preserve the VLA gripper command.
+- Add a batched/cached VLA provider before vectorized residual training. Treat the current FT-VLA
+  raw-action violations, nominal gripper competence, VLA throughput, VRAM, and queue/reset
+  isolation as explicit promotion gates.
+- Compare expert, base SmolVLA, standalone PPO, FT-VLA, and FT-VLA+PPO on identical frozen
+  scenarios and seeds.
 
-Exit gate: RL and residual-policy results are reproducible, contract-compatible, and improve the
-reviewed metrics without violating action bounds.
+The complete Step 9.1-9.10 design is in `docs/STAGE9_RL.md`.
+
+Exit gate: both PPO frameworks are reproducible and contract-compatible. Policy effectiveness is
+reported separately; residual improvement cannot be claimed without a paired safety-preserving
+gain over the corresponding FT-VLA baseline.
 
 ### Stage 10 — Add ROS 2 deployment boundary
 
@@ -553,9 +570,9 @@ The Stage 0 approval accepted:
 4. Accept the now-passing resource gate: one RTX 5090, 25 CPU quota, 90 GiB RAM, 45 GiB shared memory, and about 550 GiB data-disk free.
 5. Standard ROS messages for the MVP, deferring dual-ABI custom interface builds.
 
-Next review gates: review the formal Step 6B train/validation/test split and PEFT selection plan;
-execute the separately approved Stage 8 small-corpus closed-loop evaluation. Stages 9-11 remain
-unauthorized.
+Next review gate: review `docs/STAGE9_RL.md` and explicitly approve Stage 9 implementation scope.
+The existing Isaac lock already contains RSL-RL PPO, so the proposed first implementation does not
+request a dependency change. Stages 10-11 remain unauthorized.
 
 ## 8. References
 

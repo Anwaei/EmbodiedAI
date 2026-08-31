@@ -26,7 +26,7 @@ The post-environment roadmap follows the runtime and artifact boundaries above:
 | 6 | Isaac Demonstration Pipeline | validated immutable expert episodes and derived previews |
 | 7 | LeRobot + VLA Training Pipeline | validated `LeRobotDataset` plus SmolVLA base/PEFT artifacts |
 | 8 | Closed-loop Policy Evaluation | Isaac rollout metrics and baseline comparisons |
-| 9 | RL Policy Refinement | PPO/SAC and optional bounded residual-policy results |
+| 9 | RL Policy Refinement | privileged standalone PPO and bounded FT-VLA residual results |
 | 10 | ROS 2 deployment boundary | deployment messages, nodes, and safety-checked control path |
 | 11 | Reproducibility and robustness gate | clean rebuild and perturbation/robustness report |
 
@@ -42,7 +42,8 @@ contract. ROS 2 deployment and the final robustness gate remain separate Stages 
   recording, and randomization.
 - `src/embodied_ai/data`: dataset validation and LeRobot conversion.
 - `src/embodied_ai/policies`: policy metadata and LeRobot/SmolVLA adapters.
-- `src/embodied_ai/rl`: optional residual policy and reward components.
+- `src/embodied_ai/rl`: standalone PPO adapters, shared reward/state components, nominal-policy
+  providers, and bounded residual composition.
 - `src/embodied_ai/evaluation`: task metrics and robustness sweeps.
 - `ros2_ws/src`: ROS 2 packages added during the approved deployment stage.
 
@@ -81,6 +82,54 @@ inference is synchronous and simulation time pauses while waiting. ROS 2 remains
 
 Stage 8 writes evaluation-specific rollout manifests under the external run root rather than
 reusing demonstration `ExpertMetadata` or publishing evaluation behavior as training data.
+
+## RL refinement boundary
+
+Stage 9 keeps two PPO modes behind one canonical 7D task action and one public evaluator:
+
+```text
+Standalone mode (Isaac Python 3.11)
+  privileged low-dimensional task state
+    -> RSL-RL PPO 7D action
+    -> Isaac action adapter
+
+Residual mode
+  VLA Python 3.12 batched Policy Server
+    RGB + joint state + instruction -> frozen 7D nominal chunks
+  Isaac Python 3.11 Robot Client + RSL-RL
+    compact state + current nominal action -> bounded 6D residual
+    -> clip(clip(nominal arm) + scaled residual)
+    -> nominal gripper pass-through
+    -> Isaac action adapter
+```
+
+The standalone PPO actor is intentionally privileged and is reported as a state-based simulation
+baseline, not a deployable visual policy. The first residual actor receives no RGB or language;
+multimodal task interpretation remains inside the frozen VLA. The VLA process and Isaac/RSL-RL
+process remain isolated, and RL gradients never cross the process boundary.
+
+The implemented standalone task is registered as
+`EmbodiedAI-Franka-PickPlace-State-PPO-v0`. It subclasses the existing Franka scene/action
+foundation but owns a separate state-only observation group, randomized cube/goal reset event,
+movable non-colliding goal marker, left/right cube-filtered finger contact sensors, staged reward,
+and termination diagnostics. The original RGB demonstration and Stage 8 task remains registered
+separately and is not mutated by the RL configuration.
+
+The existing Stage 8 single-observation protocol remains valid for evaluation. Residual training
+requires a separately versioned batched request and independent per-environment action queues so
+on-policy vectorization cannot mix episodes or wait on one request per environment. A synchronous
+one-environment path is retained for integration debugging.
+
+The residual composer validates finiteness, clips the raw VLA action, clips and scales the 6D PPO
+correction with separate translation/rotation factors, clips the combined arm action again, and
+leaves the binary gripper decision with the VLA. Raw nominal, bounded nominal, raw/scaled residual,
+final action, and clip masks are all recorded. Because a 6D residual cannot repair gripper timing,
+usable nominal gripper behavior and reviewed FT-VLA saturation are formal training gates.
+
+Stage 9 evaluates the scripted expert, base SmolVLA, standalone PPO, FT-VLA, and FT-VLA+PPO on the
+same frozen scenarios/seeds. The VLA-only and residual candidates use the same versioned Stage 9
+execution-safety profile; the original Stage 8 fail-closed evidence is retained rather than
+rewritten. Detailed design and gates are in `docs/STAGE9_RL.md`.
 
 ## Demonstration generation boundary
 

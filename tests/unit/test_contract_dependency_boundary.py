@@ -6,10 +6,15 @@ from pathlib import Path
 
 _ALLOWED_STANDARD_LIBRARY_ROOTS = {
     "__future__",
+    "base64",
+    "binascii",
     "collections",
     "dataclasses",
     "enum",
+    "hashlib",
+    "json",
     "math",
+    "numbers",
     "pathlib",
     "re",
     "tomllib",
