@@ -15,13 +15,13 @@ from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.sensors import ContactSensorCfg
 from isaaclab.utils import configclass
-from isaaclab_assets.robots.franka import FRANKA_PANDA_HIGH_PD_CFG
 
 from embodied_ai.contracts.rl import STANDALONE_PPO_ACTION_PROFILE
 from embodied_ai.contracts.tasks.franka_pick_place import GOAL_MARKER_SIZE_M
 from embodied_ai.rl.config import Stage9StandalonePpoConfig, reviewed_stage9_config_path
 
 from . import rl_mdp
+from .dynamics_cfg import make_franka_high_pd_with_joint_friction
 from .env_cfg import ActionsCfg, FrankaPickPlaceEnvCfg, FrankaPickPlaceSceneCfg
 
 _REPOSITORY_ROOT = Path(__file__).resolve().parents[5]
@@ -32,8 +32,10 @@ STAGE9_STANDALONE_CONFIG = Stage9StandalonePpoConfig.from_toml(
     data_root=_DATA_ROOT,
 )
 
-_RL_FRANKA_CFG = FRANKA_PANDA_HIGH_PD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-_RL_FRANKA_CFG.spawn.activate_contact_sensors = True
+_RL_FRANKA_CFG = make_franka_high_pd_with_joint_friction(
+    prim_path="{ENV_REGEX_NS}/Robot",
+    activate_contact_sensors=True,
+)
 
 
 @configclass

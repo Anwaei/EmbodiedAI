@@ -671,3 +671,12 @@ request a dependency change. Stages 10-11 remain unauthorized.
   video-backed `LeRobotDataset`, reopened it independently, and passed full source provenance,
   table, statistics, timestamp, task, and 200-image reload validation. No package, lock, driver,
   model, raw source, prior dataset, processor, inference, or training artifact was changed.
+- 2026-09-26: Added the reviewed `franka-joint-friction-v1` simulator profile and one shared
+  Franka builder for the RGB and PPO scenes. The profile applies conservative per-joint Coulomb
+  and viscous arm friction through native Isaac Sim 5.1/PhysX articulation properties; gripper
+  friction remains on upstream defaults. Added dependency-light config tests, a live GPU smoke
+  report, and friction identity in new collection/training/evaluation provenance. Both uv locks
+  passed read-only checks; 76 unit tests passed with two intentional skips; live articulation,
+  RGB-scene, and 108-step successful expert regression checks passed. No dependency, lock,
+  environment, driver, dataset, model, or existing artifact was modified. Earlier datasets,
+  adapters, evaluations, and PPO checkpoints continue to describe the pre-profile dynamics.

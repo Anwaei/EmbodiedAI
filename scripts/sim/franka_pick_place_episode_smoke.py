@@ -87,6 +87,8 @@ def _configuration_revision(repository_root: Path) -> str:
     digest = hashlib.sha256()
     relative_paths = (
         "src/embodied_ai/contracts/tasks/franka_pick_place.py",
+        "configs/sim/franka_pick_place/joint_friction_v1.toml",
+        "src/embodied_ai/sim/tasks/franka_pick_place/dynamics_cfg.py",
         "src/embodied_ai/sim/tasks/franka_pick_place/env_cfg.py",
         "src/embodied_ai/sim/tasks/franka_pick_place/evaluation.py",
         "src/embodied_ai/sim/tasks/franka_pick_place/mdp.py",

@@ -2,7 +2,9 @@
 
 - `bootstrap/`: explicit shell setup and environment lifecycle helpers.
 - `preflight/`: read-only machine and dependency checks.
-- `sim/`: simulation and demonstration entry points.
+- `sim/`: simulation and demonstration entry points. The joint-friction smoke test verifies the
+  reviewed TOML values against the live PhysX articulation and writes its report below
+  `$EMBODIEDAI_ARTIFACTS/sim-dynamics`.
 - `data/`: validation and conversion entry points.
 - `train/`: VLA, standalone PPO, and residual-policy training entry points. The standalone PPO
   entry supports fixed/distribution geometry, periodic checkpoints, and exact checkpoint resume.

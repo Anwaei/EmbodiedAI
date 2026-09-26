@@ -1,6 +1,8 @@
 # Configuration
 
-- `sim/`: scenes, robots, sensors, controllers, and randomization.
+- `sim/`: scenes, robots, sensors, controllers, randomization, and reviewed dynamics profiles.
+  `sim/franka_pick_place/joint_friction_v1.toml` is the active Franka arm
+  Coulomb-plus-viscous friction baseline.
 - `data/`: recording, validation, and export configuration.
 - `policy/`: SmolVLA training and inference configuration.
 - `rl/`: standalone PPO and later bounded residual PPO configuration. The v1 standalone profile is

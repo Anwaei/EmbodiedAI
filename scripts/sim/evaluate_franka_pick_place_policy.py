@@ -78,6 +78,9 @@ from embodied_ai.sim.tasks.franka_pick_place.env_cfg import (
     FrankaPickPlaceEnvCfg,
     apply_episode_parameters,
 )
+from embodied_ai.sim.tasks.franka_pick_place.dynamics_cfg import (
+    franka_joint_friction_identity,
+)
 
 
 def _sha256(path: Path) -> str:
@@ -161,6 +164,7 @@ def main() -> None:
         "isaac_sim_version": version("isaacsim"),
         "isaac_lab_version": version("isaaclab"),
         "device": args_cli.device,
+        "joint_friction": franka_joint_friction_identity(),
     }
     completed = 0
     for scenario in scenarios:

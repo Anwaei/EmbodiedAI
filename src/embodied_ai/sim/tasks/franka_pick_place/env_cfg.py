@@ -18,7 +18,6 @@ from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import FrameTransformerCfg, TiledCameraCfg
 from isaaclab.sensors.frame_transformer.frame_transformer_cfg import OffsetCfg
 from isaaclab.utils import configclass
-from isaaclab_assets.robots.franka import FRANKA_PANDA_HIGH_PD_CFG
 
 from embodied_ai.contracts.tasks.franka_pick_place import (
     CAMERA_HEIGHT,
@@ -34,6 +33,7 @@ from embodied_ai.contracts.tasks.franka_pick_place import (
 
 from . import evaluation as task_evaluation
 from . import mdp as task_mdp
+from .dynamics_cfg import make_franka_high_pd_with_joint_friction
 
 ROBOT_JOINT_NAMES = [
     "panda_joint1",
@@ -78,7 +78,9 @@ class FrankaPickPlaceSceneCfg(InteractiveSceneCfg):
         ),
     )
 
-    robot = FRANKA_PANDA_HIGH_PD_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot = make_franka_high_pd_with_joint_friction(
+        prim_path="{ENV_REGEX_NS}/Robot"
+    )
 
     cube = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Cube",

@@ -1,0 +1,28 @@
+schema_version = "embodied-ai.franka-joint-friction/v1"
+profile = "franka-joint-friction-v1"
+
+[arm]
+joint_names = [
+  "panda_joint1",
+  "panda_joint2",
+  "panda_joint3",
+  "panda_joint4",
+  "panda_joint5",
+  "panda_joint6",
+  "panda_joint7",
+]
+
+# Conservative simulation baseline, not parameters identified from a physical Panda.
+# In Isaac Sim 5.x these values are joint efforts: N*m for revolute arm joints.
+coulomb_friction_nm = [0.20, 0.20, 0.15, 0.15, 0.10, 0.08, 0.05]
+
+# Viscous coefficient units are N*m*s/rad for the revolute arm joints.
+viscous_friction_nm_s_rad = [0.05, 0.05, 0.04, 0.04, 0.03, 0.02, 0.02]
+
+[gripper]
+# Finger friction is deliberately out of scope for v1. Keeping it disabled preserves
+# the upstream USD/Isaac Lab hand settings and avoids changing grasp semantics twice.
+enabled = false
+joint_names = ["panda_finger_joint1", "panda_finger_joint2"]
+coulomb_friction_n = [0.0, 0.0]
+viscous_friction_n_s_m = [0.0, 0.0]

@@ -137,6 +137,8 @@ def _configuration_revision(root: Path, expert_config: Path) -> str:
     digest = hashlib.sha256()
     paths = (
         root / "src/embodied_ai/contracts/tasks/franka_pick_place.py",
+        root / "configs/sim/franka_pick_place/joint_friction_v1.toml",
+        root / "src/embodied_ai/sim/tasks/franka_pick_place/dynamics_cfg.py",
         root / "src/embodied_ai/sim/tasks/franka_pick_place/env_cfg.py",
         root / "src/embodied_ai/sim/tasks/franka_pick_place/evaluation.py",
         root / "src/embodied_ai/sim/experts/franka_pick_place_state_machine.py",

@@ -52,6 +52,9 @@ from embodied_ai.sim.tasks.franka_pick_place import RL_TASK_ID
 from embodied_ai.sim.tasks.franka_pick_place.agents.rsl_rl_ppo_cfg import (
     FrankaPickPlacePPORunnerCfg,
 )
+from embodied_ai.sim.tasks.franka_pick_place.dynamics_cfg import (
+    franka_joint_friction_identity,
+)
 from embodied_ai.sim.tasks.franka_pick_place.rl_env_cfg import (
     STAGE9_STANDALONE_CONFIG,
     FrankaPickPlacePPOEnvCfg,
@@ -193,6 +196,7 @@ def main() -> None:
             "path": str(reviewed_config_path),
             "sha256": _sha256(reviewed_config_path),
         },
+        "joint_friction": franka_joint_friction_identity(),
     }
     _write_json_atomic(manifest_path, manifest)
 

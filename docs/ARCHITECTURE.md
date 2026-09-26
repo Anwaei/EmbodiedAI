@@ -60,6 +60,27 @@ contract. ROS 2 deployment and the final robustness gate remain separate Stages 
 - Standard ROS messages are preferred for the MVP. Custom interfaces require explicit
   Python 3.10 and Python 3.11 build validation.
 
+## Simulator dynamics profile
+
+Franka arm friction is a versioned simulator input rather than an action-controller concern. The
+reviewed TOML profile declares one Coulomb effort and one viscous coefficient per arm joint. A
+single builder creates independent copies of Isaac Lab's high-PD Franka configuration and applies
+the profile to both the RGB demonstration/evaluation scene and the state-only PPO scene. This
+keeps the normalized 7D action contract, relative IK controller, reward functions, and policy
+interfaces unchanged.
+
+For Isaac Sim 5.1, the model sets static and dynamic friction efforts to the same per-joint
+Coulomb value and sets the PhysX viscous coefficient independently. It therefore approximates
+`tau_f = tau_c * sign(q_dot) + b * q_dot` using the simulator's native joint solver. Finger
+friction remains on the upstream USD defaults in v1 so grasp behavior is not changed at the same
+time as arm dynamics. The profile is a conservative simulation baseline, not a claim of physical
+Panda parameter identification.
+
+New expert collection, Stage 8 evaluation, and PPO train/evaluation provenance pin the exact
+profile path, SHA-256, and values. Previously generated datasets, adapters, checkpoints, and
+reports remain immutable evidence from the earlier no-explicit-friction configuration; they must
+not be relabeled as friction-enabled artifacts.
+
 ## Closed-loop evaluation boundary
 
 Stage 8 implements online evaluation as a Robot Client + Policy Server pair on one host:

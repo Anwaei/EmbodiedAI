@@ -24,6 +24,60 @@ The table and cube use procedural primitives so the task does not add another re
 dependency. The Franka asset remains the pinned Isaac Lab asset already validated in Stage 4.
 The tiled camera keeps the same batched sensor path when `num_envs` is increased later.
 
+### Joint friction model
+
+The active Franka arm model adds native Isaac Sim 5.1 joint friction through
+`configs/sim/franka_pick_place/joint_friction_v1.toml`. For each revolute arm joint, the intended
+model is:
+
+```text
+tau_f = tau_c * sign(q_dot) + b * q_dot
+```
+
+Isaac Sim 5.x represents the static and dynamic friction settings as joint efforts. The robot
+builder therefore writes the same `tau_c` to both properties and writes `b` to viscous friction.
+The reviewed conservative baseline is:
+
+| Joint | Coulomb effort `tau_c` (N m) | Viscous `b` (N m s/rad) |
+|---|---:|---:|
+| `panda_joint1` | 0.20 | 0.05 |
+| `panda_joint2` | 0.20 | 0.05 |
+| `panda_joint3` | 0.15 | 0.04 |
+| `panda_joint4` | 0.15 | 0.04 |
+| `panda_joint5` | 0.10 | 0.03 |
+| `panda_joint6` | 0.08 | 0.02 |
+| `panda_joint7` | 0.05 | 0.02 |
+
+These are engineering baseline values, not parameters identified from a physical robot. Gripper
+friction remains disabled in this profile and keeps the upstream USD settings. The existing
+high-PD gains, gravity-disabled robot baseline, relative-IK action scaling, control rate, and all
+observation/action contracts are unchanged. Consequently, this change tests arm tracking under
+additional resistance but is not yet a full actuator or Sim2Real model.
+
+`dynamics_cfg.py` is the sole binding point. Both `FrankaPickPlaceSceneCfg` and
+`FrankaPickPlacePPOSceneCfg` use its builder, avoiding dynamics drift between demonstration,
+closed-loop evaluation, and PPO. Run manifests/reports pin the profile SHA-256 and values. The
+live smoke test checks the values read back from the initialized articulation before bounded
+steps:
+
+```bash
+source scripts/bootstrap/project_env.sh
+PYTHONPATH=src "$EMBODIEDAI_ENVS/isaac/bin/python" \
+  scripts/sim/franka_joint_friction_smoke.py \
+  --headless --device cuda:0 --num_envs 4 --steps 3
+```
+
+The RTX 5090 validation on 2026-09-26 read back all static, dynamic, and viscous values from the
+live articulation, completed the four-environment bounded step test, and passed the RGB scene
+smoke. A full state-machine regression also remained successful in 108 control steps with the
+same phase counts as the earlier baseline. The machine-readable readback is stored at
+`$EMBODIEDAI_ARTIFACTS/sim-dynamics/franka_joint_friction_smoke.json`.
+
+Artifacts created before this profile was added remain valid historical outputs but represent the
+old dynamics. In particular, the existing expert corpora, SmolVLA adapters, Stage 8 reports, and
+PPO checkpoints are not retroactively friction-enabled and require explicit regeneration or
+reevaluation before comparative claims.
+
 ### Timing and action interface
 
 Physics runs at 120 Hz with decimation 6, producing a 20 Hz control boundary. The seven
